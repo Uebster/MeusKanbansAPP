@@ -1,18 +1,46 @@
-// public/script.js
+// public/script.js — COMPLETO
 
-const { ipcRenderer } = require("electron");
+const { send, on, invoke } = window.electronAPI;
 
 // Captura userId da query string
-const params = new URLSearchParams(window.location.search);
-const userId = params.get("userId");
+let userId = null;
 
 // — Estado Global —
 let boards        = [];
+let needsBackup   = false; // controla se precisa fazer backup ao fechar
 let activeBoardId = null;
 let fileInput     = null;
-let lastUsedCardColor = localStorage.getItem("lastUsedCardColor") || "#858585";
+let lastUsedCardColor   = localStorage.getItem("lastUsedCardColor")   || "#858585";
 let lastUsedColumnColor = localStorage.getItem("lastUsedColumnColor") || "#ffffff";
-let lastUsedTextColor = localStorage.getItem("lastUsedTextColor") || "#3d3d3d";
+let lastUsedTextColor   = localStorage.getItem("lastUsedTextColor")   || "#3d3d3d";
+
+// — Histórico para desfazer —
+let history = [];
+function saveState() {
+  try {
+    const snapshot = JSON.stringify(boards);
+    history.push(snapshot);
+    if (history.length > 100) history.shift();
+  } catch (err) {
+    console.error("Erro ao salvar estado:", err);
+  }
+}
+function undo() {
+  if (!history.length) return;
+  try {
+    const last = history.pop();
+    boards = JSON.parse(last);
+    if (!boards.find(b => b.id === activeBoardId)) {
+      activeBoardId = boards[0]?.id || null;
+    }
+    renderUI();
+    saveBoards();
+    showMessage("Ação desfeita com sucesso.");
+  } catch (err) {
+    console.error("Erro ao desfazer:", err);
+    showMessage("Não foi possível desfazer.", true);
+  }
+}
 
 // — Elementos de contexto (menus etc.) —
 let cardMenuEl   = null;
@@ -28,38 +56,54 @@ const tColumnMenu   = document.getElementById("column-menu");
 
 // — Inicialização após DOM carregado —
 document.addEventListener("DOMContentLoaded", async () => {
-  // 1) Injetar nome do usuário no sidebar
-  if (userId) {
-    const user = await ipcRenderer.invoke("get-user", userId);
-    document.getElementById("sidebar-user-name")
-            .textContent = `👤 ${user.username}`;
+  userId = new URLSearchParams(location.search).get("userId");
+  if (!userId) {
+    console.error("userId não encontrado na URL");
+    return;
   }
 
-  // 2) Criar input oculto para import JSON
+  const user = await invoke("get-user", userId);
+  document.getElementById("sidebar-user-name").textContent =
+    `👤 ${user?.username || ""}`;
+
+  // input oculto pra import
   fileInput = document.createElement("input");
-  fileInput.type    = "file";
-  fileInput.accept  = "application/json";
-  fileInput.hidden  = true;
+  fileInput.type = "file";
+  fileInput.accept = "application/json";
+  fileInput.hidden = true;
   fileInput.addEventListener("change", handleImport);
   document.body.appendChild(fileInput);
 
-  // 3) Configurar botões da sidebar
+  // botões da sidebar
   bindSidebarButtons();
 
-  // 4) Request inicial de boards ao main (inclui userId)
-  ipcRenderer.send("load-boards", userId);
-  ipcRenderer.on("load-result", (_e, loaded) => {
-    boards = loaded;
+  // carregar boards do main (uma vez só)
+  console.log("Enviando load-boards com userId:", userId);
+  send("load-boards", userId);
+
+  // preload passa só args, sem 'event'
+  on("load-result", (loaded) => {
+    console.log("Recebido do main:", loaded);
+    boards = Array.isArray(loaded) ? loaded : [];
     if (!activeBoardId && boards.length) {
       activeBoardId = boards[0].id;
     }
+    history = []; // limpa histórico ao carregar do disco
     renderUI();
   });
 
-  // 5) Fechar menus de contexto ao clicar fora
+  // fechar menus ao clicar fora
   document.body.addEventListener("click", e => {
     if (cardMenuEl && !cardMenuEl.contains(e.target)) closeCardMenu();
     if (columnMenuEl && !columnMenuEl.contains(e.target)) closeColumnMenu();
+  });
+
+  // desfazer com Ctrl+Z
+  document.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      undo();
+    }
   });
 });
 
@@ -88,10 +132,10 @@ function bindSidebarButtons() {
       openCardDialog();
     });
 
-  // Salvar alterações (agora inclui userId)
+  // Salvar alterações
   document.getElementById("save-btn")
     .addEventListener("click", () => {
-      ipcRenderer.send("save-boards", boards, userId);
+      send("save-boards", boards, userId);
     });
 
   // Exportar JSON
@@ -102,11 +146,11 @@ function bindSidebarButtons() {
   document.getElementById("import-btn")
     .addEventListener("click", () => fileInput.click());
 
-  // Exportar Imagem (HTML2Canvas)
+  // Exportar Imagem
   document.getElementById("exportImageBtn")
     .addEventListener("click", exportImage);
 
-  // Imprimir (rodapé + print dialog)
+  // Imprimir
   document.getElementById("print-btn")
     .addEventListener("click", printWithFooter);
 
@@ -116,7 +160,7 @@ function bindSidebarButtons() {
 
   // Sair do app
   document.getElementById("exit-btn")
-    .addEventListener("click", () => ipcRenderer.send("app-close"));
+    .addEventListener("click", () => window.close());
 
   // Select de quadros
   document.getElementById("board-select")
@@ -140,7 +184,7 @@ function bindSidebarButtons() {
     });
 
   // Feedback de save
-  ipcRenderer.on("save-result", (_e, ok) => {
+  on("save-result", (ok) => {
     showMessage(ok ? "Alterações salvas com sucesso" : "Erro ao salvar", !ok);
   });
 }
@@ -181,7 +225,10 @@ function handleImport(e) {
       if (!Array.isArray(data)) throw new Error();
       boards = data;
       activeBoardId = boards[0]?.id || null;
-      ipcRenderer.send("save-boards", boards, userId);
+      history = []; // novo conjunto, limpa histórico
+      needsBackup = true;
+      send("set-needs-backup", true);
+      send("save-boards", boards, userId);
       renderUI();
     } catch {
       showMessage("JSON inválido", true);
@@ -202,7 +249,7 @@ function toggleTheme() {
   }
 })();
 
-// — BACKUP em localStorage (até 30 versões) —
+// — BACKUP localStorage —
 function backupStore(state) {
   const key    = 'kanbanBackups';
   const stored = localStorage.getItem(key);
@@ -214,18 +261,102 @@ function backupStore(state) {
 
 // — SALVAR com backup e notificação via IPC —
 function saveBoards() {
+  console.log("Salvando boards:", boards);
+  if (!userId) {
+    console.error("userId está indefinido");
+    return;
+  }
+  if (!Array.isArray(boards)) {
+    console.error("boards não é um array");
+    return;
+  }
   backupStore(boards);
-  ipcRenderer.send("save-boards", boards, userId);
+  send("save-boards", boards, userId);
 }
 
-// — RENDERIZAÇÃO GERAL —
+function openConfirmDialog({ title = "Confirmar ação", message = "Tem certeza?", variant = "default" } = {}) {
+  return new Promise((resolve) => {
+    const tpl = document.getElementById("confirm-dialog");
+    const dlg = tpl.content.cloneNode(true).querySelector("dialog");
+
+    dlg.querySelector("#confirm-title").textContent = title;
+    dlg.querySelector("#confirm-message").textContent = message;
+
+    const okBtn     = dlg.querySelector("#confirm-ok-btn");
+    const cancelBtn = dlg.querySelector("#confirm-cancel-btn");
+
+    okBtn.addEventListener("click", () => {
+      dlg.close();
+      dlg.remove();
+      resolve(true);
+    });
+
+    cancelBtn.addEventListener("click", () => {
+      dlg.close();
+      dlg.remove();
+      resolve(false);
+    });
+
+    dlg.addEventListener("cancel", (e) => {
+      e.preventDefault();
+      dlg.close();
+      dlg.remove();
+      resolve(false);
+    });
+
+    document.body.appendChild(dlg);
+    dlg.showModal();
+    requestAnimationFrame(() => okBtn.focus());
+  });
+}
+
+// — RENDERIZAÇÃO —
 function renderUI() {
+  // Fecha e remove qualquer dialog aberto (previne backdrop zumbi)
+  document.querySelectorAll("dialog[open]").forEach(d => {
+    try { d.close(); } catch {}
+    d.remove();
+  });
+
   renderBoardSelect();
   renderSidebarIndex();
   renderBoard();
 }
 
-// — POPULA <select> de quadros —
+function forceFocusUnlock() {
+  // Fecha e remove qualquer dialog “aberto” que tenha ficado preso
+  document.querySelectorAll("dialog[open]").forEach(d => {
+    try { d.close(); } catch {}
+    d.remove();
+  });
+
+  // Destrava ponteiro/teclado no body/app por 1 frame
+  const app = document.getElementById("app");
+  const prevBodyPE = document.body.style.pointerEvents;
+  const prevAppPE  = app?.style.pointerEvents;
+  document.body.style.pointerEvents = "auto";
+  if (app) app.style.pointerEvents = "auto";
+
+  // Pequena pausa para o layout assentar, depois força foco num alvo certo
+  requestAnimationFrame(() => {
+    // tenta focar o select de quadros
+    const select = document.getElementById("board-select");
+    if (select) {
+      select.focus();
+    } else {
+      const addBoardBtn = document.getElementById("add-board-btn");
+      addBoardBtn?.focus();
+    }
+
+    // restaura pointer-events no próximo frame (só para evitar efeitos colaterais)
+    requestAnimationFrame(() => {
+      document.body.style.pointerEvents = prevBodyPE || "";
+      if (app) app.style.pointerEvents = prevAppPE || "";
+    });
+  });
+}
+
+// — Select de quadros —
 function renderBoardSelect() {
   const sel = document.getElementById("board-select");
   sel.innerHTML = "";
@@ -247,7 +378,7 @@ function renderBoardSelect() {
   });
 }
 
-// — ÍNDICE LATERAL —
+// — Índice lateral —
 function renderSidebarIndex() {
   const ul = document.getElementById("index-list");
   ul.innerHTML = "";
@@ -261,14 +392,13 @@ function renderSidebarIndex() {
     const li = document.createElement("li");
     li.dataset.boardId = b.id;
     li.innerHTML = `
-      <span class="idx-board-title${
-        b.id === activeBoardId ? " active" : ""
-      }">${b.title}</span>
+      <span class="idx-board-title${b.id === activeBoardId ? " active" : ""}">
+        ${b.title}
+      </span>
       <ul>
         ${b.columns.map(c => `<li>${c.title}</li>`).join("")}
       </ul>`;
-    li
-      .querySelector(".idx-board-title")
+    li.querySelector(".idx-board-title")
       .addEventListener("click", () => {
         activeBoardId = b.id;
         renderUI();
@@ -277,8 +407,14 @@ function renderSidebarIndex() {
   });
 }
 
-// — MONTA COLUNAS e CARTÕES —
+// — Monta colunas e cartões —
 function renderBoard() {
+  // Garantia extra: nenhum dialog modal deve estar aberto agora
+  document.querySelectorAll("dialog[open]").forEach(d => {
+    try { d.close(); } catch {}
+    d.remove();
+  });
+
   const container = document.getElementById("columns-container");
   container.innerHTML = "";
 
@@ -362,7 +498,7 @@ function renderBoard() {
   colsWrapper.addEventListener("drop", handleColumnDrop);
 }
 
-// — MOVIMENTA CARTÃO entre colunas —
+// — Drag & drop cartões —
 function handleCardDrop(e) {
   e.preventDefault();
   const data = JSON.parse(e.dataTransfer.getData("application/json"));
@@ -374,9 +510,11 @@ function handleCardDrop(e) {
   const toCol   = board.columns.find(c => c.id === toColId);
 
   const idx = fromCol.tasks.findIndex(t => t.id === data.cardId);
+
+  saveState(); // snapshot antes de mover
   const [tsk] = fromCol.tasks.splice(idx, 1);
 
-  // Insere na posição certa verticalmente
+  // posição vertical
   const cardsElems = Array.from(e.currentTarget.children);
   let pos = toCol.tasks.length;
   for (let i = 0; i < cardsElems.length; i++) {
@@ -389,10 +527,10 @@ function handleCardDrop(e) {
   toCol.tasks.splice(pos, 0, tsk);
 
   saveBoards();
-  renderUI();
+  renderBoard(); // só redesenha as colunas
 }
 
-// — RE‐ORDER de COLUNA via drag na área —
+// — Drag & drop colunas —
 function handleColumnDrop(e) {
   e.preventDefault();
   let data;
@@ -404,6 +542,8 @@ function handleColumnDrop(e) {
   if (!data.columnId || data.cardId) return;
 
   const board = boards.find(b => b.id === activeBoardId);
+  if (!board) return;
+
   const cols  = board.columns;
   const fromI = cols.findIndex(c => c.id === data.columnId);
   if (fromI < 0) return;
@@ -417,11 +557,14 @@ function handleColumnDrop(e) {
     });
   if (toI > fromI) toI--;
 
+  saveState(); // snapshot antes de mover coluna
   const [moved] = cols.splice(fromI, 1);
   cols.splice(toI, 0, moved);
 
+  needsBackup = true;
+  send("set-needs-backup", true);
   saveBoards();
-  renderUI();
+  renderBoard(); // redesenha só as colunas
 }
 
 // — MENU de contexto de CARTÃO —
@@ -430,26 +573,42 @@ function openCardMenu(cardEl, bId, cId, tId) {
   closeColumnMenu();
   menuContext = { boardId: bId, columnId: cId, cardId: tId };
 
-  const menu = tCardMenu.content
-    .cloneNode(true)
-    .querySelector(".card-menu");
-  const r    = cardEl.getBoundingClientRect();
-  menu.style.top  = `${r.bottom + 5}px`;
-  menu.style.left = `${r.left}px`;
+  const menu = tCardMenu.content.cloneNode(true).querySelector(".card-menu");
+  const r = cardEl.getBoundingClientRect();
+const menuHeight = 120; // ajuste conforme altura média do menu
+const menuWidth  = 180; // ajuste conforme largura média do menu
+
+let top = r.bottom + 5;
+if (r.bottom + menuHeight > window.innerHeight) {
+  top = r.top - menuHeight - 5;
+  if (top < 0) top = 10;
+}
+
+let left = r.left;
+if (r.left + menuWidth > window.innerWidth) {
+  left = window.innerWidth - menuWidth - 10;
+}
+
+menu.style.top  = `${top}px`;
+menu.style.left = `${left}px`;
+
   menu.addEventListener("click", ev => ev.stopPropagation());
 
-  menu
-    .querySelector("#card-edit-btn")
-    .addEventListener("click", () => {
-      openCardDialog(cId, tId);
-      closeCardMenu();
+  menu.querySelector("#card-edit-btn")
+      .addEventListener("click", () => {
+        openCardDialog(cId, tId);
+        closeCardMenu();
+      });
+
+  menu.querySelector("#card-delete-btn")
+  .addEventListener("click", async () => {
+    const ok = await openConfirmDialog({
+      title: "Excluir cartão",
+      message: "Deseja mesmo excluir este cartão? Esta ação não pode ser desfeita."
     });
-  menu
-    .querySelector("#card-delete-btn")
-    .addEventListener("click", () => {
-      if (confirm("Excluir cartão?")) removeCurrentTask();
-      closeCardMenu();
-    });
+    if (ok) removeCurrentTask();
+    closeCardMenu();
+  });
 
   document.body.appendChild(menu);
   cardMenuEl = menu;
@@ -463,31 +622,58 @@ function closeCardMenu() {
 function openColumnMenu(colEl, bId, cId) {
   closeCardMenu();
   closeColumnMenu();
-  const menu = tColumnMenu.content
-    .cloneNode(true)
-    .querySelector(".column-menu");
-  const r    = colEl.getBoundingClientRect();
-  menu.style.top  = `${r.bottom + 5}px`;
-  menu.style.left = `${r.left}px`;
+  const menu = tColumnMenu.content.cloneNode(true).querySelector(".column-menu");
+  const r = colEl.getBoundingClientRect();
+const menuHeight = 120;
+const menuWidth  = 180;
+
+let top = r.bottom + 5;
+if (r.bottom + menuHeight > window.innerHeight) {
+  top = r.top - menuHeight - 5;
+  if (top < 0) top = 10;
+}
+
+let left = r.left;
+if (r.left + menuWidth > window.innerWidth) {
+  left = window.innerWidth - menuWidth - 10;
+}
+
+menu.style.top  = `${top}px`;
+menu.style.left = `${left}px`;
   menu.addEventListener("click", ev => ev.stopPropagation());
 
-  menu
-    .querySelector("#column-edit-btn")
-    .addEventListener("click", () => {
-      openColumnDialog(cId);
-      closeColumnMenu();
+  menu.querySelector("#column-edit-btn")
+      .addEventListener("click", () => {
+        openColumnDialog(cId);
+        closeColumnMenu();
+      });
+
+  menu.querySelector("#column-delete-btn")
+  .addEventListener("click", async () => {
+    const ok = await openConfirmDialog({
+      title: "Excluir coluna",
+      message: "Tem certeza que deseja excluir esta coluna e todos os seus cartões?"
     });
-  menu
-    .querySelector("#column-delete-btn")
-    .addEventListener("click", () => {
-      if (confirm("Excluir coluna?")) {
-        const bd = boards.find(b => b.id === bId);
-        bd.columns = bd.columns.filter(c => c.id !== cId);
-        saveBoards();
-        renderUI();
-      }
-      closeColumnMenu();
-    });
+    if (!ok) { closeColumnMenu(); return; }
+
+    const openDlg = document.querySelector("dialog[open]");
+    if (openDlg) {
+      try { openDlg.close(); } catch {}
+      openDlg.remove();
+    }
+
+    const bd = boards.find(b => b.id === bId);
+    if (!bd) { closeColumnMenu(); return; }
+
+    saveState(); // snapshot antes de excluir coluna
+    bd.columns = bd.columns.filter(c => c.id !== cId);
+    needsBackup = true;
+    send("set-needs-backup", true);
+    saveBoards();
+    renderBoard();
+    closeColumnMenu();
+    forceFocusUnlock();
+  });
 
   document.body.appendChild(menu);
   columnMenuEl = menu;
@@ -499,97 +685,140 @@ function closeColumnMenu() {
 
 // — REMOVER CARTÃO via menu —
 function removeCurrentTask() {
+  // Se um dialog estiver aberto, feche-o antes de mexer no DOM
+  const openDlg = document.querySelector("dialog[open]");
+  if (openDlg) {
+    try { openDlg.close(); } catch {}
+    openDlg.remove();
+  }
+
+  if (!boards.length) return;
   const { boardId, columnId, cardId } = menuContext;
   const bd  = boards.find(b => b.id === boardId);
+  if (!bd) return;
   const col = bd.columns.find(c => c.id === columnId);
+  if (!col) return;
+
+  saveState(); // snapshot antes de excluir cartão
   col.tasks = col.tasks.filter(t => t.id !== cardId);
   saveBoards();
-  renderUI();
+  renderBoard(); // só colunas/cartões
+  forceFocusUnlock();
 }
 
 // — DELETAR QUADRO INTEIRO —
-function deleteBoard(bId) {
-  if (!confirm("Excluir quadro e todo o conteúdo?")) return;
+async function deleteBoard(bId) {
+  if (!boards.length) return;
+  const ok = await openConfirmDialog({
+    title: "Excluir quadro",
+    message: "Tem certeza que deseja excluir este quadro e todo o seu conteúdo?"
+  });
+  if (!ok) return;
+
+  // Fecha e remove qualquer dialog aberto antes do render
+  const openDlg = document.querySelector("dialog[open]");
+  if (openDlg) {
+    try { openDlg.close(); } catch {}
+    openDlg.remove();
+  }
+
+  saveState(); // snapshot antes de deletar quadro
   boards = boards.filter(b => b.id !== bId);
   activeBoardId = boards[0]?.id || null;
+
+  needsBackup = true;
+  send("set-needs-backup", true);
   saveBoards();
-  renderUI();
+
+  // Se ainda houver algum dialog (por timing), render só colunas
+  if (document.querySelector("dialog[open]")) {
+    renderBoard();
+  } else {
+    renderUI(); // select + índice + colunas
+  }
 }
 
 // — DIÁLOGO: Criar/Editar QUADRO —
 function openBoardDialog(boardId = null) {
-  const dlg   = tBoardDialog.content
-    .cloneNode(true)
-    .querySelector("dialog");
+  const dlg   = tBoardDialog.content.cloneNode(true).querySelector("dialog");
   const input = dlg.querySelector("#board-title-input");
-  if (boardId) input.value = boards.find(b => b.id === boardId).title;
+  if (boardId) input.value = boards.find(b => b.id === boardId)?.title || "";
 
   dlg.style.fontSize = "1.2em";
   dlg.style.padding  = "1em";
-  dlg
-    .querySelector("#board-save-btn")
-    .addEventListener("click", () => {
-      const v = input.value.trim();
-      if (!v) return;
-      if (boardId) {
-        const b = boards.find(b => b.id === boardId);
-        b.title = v;
-      } else {
-        boards.push({ id: `${Date.now()}`, title: v, columns: [] });
-        activeBoardId = boards.at(-1).id;
-      }
-      saveBoards();
-      renderUI();
-      dlg.close();
-      dlg.remove();
-    });
-  dlg
-    .querySelector("#board-cancel-btn")
-    .addEventListener("click", () => {
-      dlg.close();
-      dlg.remove();
-    });
+
+  dlg.querySelector("#board-save-btn")
+     .addEventListener("click", () => {
+       const v = input.value.trim();
+       if (!v) return;
+
+       saveState(); // snapshot antes de editar/criar quadro
+
+       if (boardId) {
+         const b = boards.find(b => b.id === boardId);
+         if (!b) return;
+         b.title = v;
+       } else {
+         if (!Array.isArray(boards)) boards = [];
+         boards.push({ id: `${Date.now()}`, title: v, columns: [] });
+         activeBoardId = boards.at(-1).id;
+       }
+       needsBackup = true;
+       send("set-needs-backup", true);
+       saveBoards();
+       renderUI();
+       dlg.close();
+       dlg.remove();
+     });
+
+  dlg.querySelector("#board-cancel-btn")
+     .addEventListener("click", () => {
+       dlg.close();
+       dlg.remove();
+     });
 
   document.body.appendChild(dlg);
   dlg.showModal();
+  // reforço de foco no próximo frame
+  requestAnimationFrame(() => input?.focus());
 }
 
 // — DIÁLOGO: Criar/Editar COLUNA —
 function openColumnDialog(columnId = null) {
-  const dlg    = tColumnDialog.content
-                    .cloneNode(true)
-                    .querySelector("dialog");
+  const dlg    = tColumnDialog.content.cloneNode(true).querySelector("dialog");
   const titleI = dlg.querySelector("#column-title-input");
   const colorI = dlg.querySelector("#column-color-input");
   const delBtn = dlg.querySelector("#column-delete-btn");
   const bd     = boards.find(b => b.id === activeBoardId);
 
   if (columnId) {
-    const col = bd.columns.find(c => c.id === columnId);
-    titleI.value = col.title;
-    colorI.value = col.color;
+    const col = bd?.columns.find(c => c.id === columnId);
+    if (col) {
+      titleI.value = col.title;
+      colorI.value = col.color;
+    }
   } else {
     colorI.value = lastUsedColumnColor;
-    delBtn.remove();
+    delBtn?.remove();
   }
 
-  // Impede que Esc “trave” o foco
   dlg.addEventListener("cancel", e => {
     e.preventDefault();
     dlg.close();
   });
-
-  // Remove do DOM sempre que fechar
   dlg.addEventListener("close", () => dlg.remove());
 
-  // Salvar coluna
   dlg.querySelector("#column-save-btn")
      .addEventListener("click", () => {
        const t = titleI.value.trim();
        const c = colorI.value;
-       if (!t) return;
+       if (!t || !bd) return;
+
+       saveState(); // snapshot antes de editar/criar coluna
+
        if (columnId) {
          const col = bd.columns.find(c => c.id === columnId);
+         if (!col) return;
          col.title = t;
          col.color = c;
        } else {
@@ -602,40 +831,55 @@ function openColumnDialog(columnId = null) {
        }
        lastUsedColumnColor = c;
        localStorage.setItem("lastUsedColumnColor", c);
+
+       needsBackup = true;
+       send("set-needs-backup", true);
        saveBoards();
-       renderUI();
+       renderBoard(); // só colunas
        dlg.close();
      });
 
   // Excluir coluna (se existir)
-  delBtn?.addEventListener("click", () => {
-    if (confirm("Excluir coluna?")) {
-      bd.columns = bd.columns.filter(c => c.id !== columnId);
-      saveBoards();
-      renderUI();
-      dlg.close();
-    }
+  delBtn?.addEventListener("click", async () => {
+    const ok = await openConfirmDialog({
+      title: "Excluir coluna",
+      message: "Tem certeza que deseja excluir esta coluna e todos os seus cartões?"
+    });
+    if (!ok) return;
+
+    // Fecha este dialog antes de render para não deixar backdrop preso
+    try { dlg.close(); } catch {}
+    dlg.remove();
+
+    const bd = boards.find(b => b.id === activeBoardId);
+    if (!bd) return;
+
+    saveState(); // snapshot antes de excluir coluna
+    bd.columns = bd.columns.filter(c => c.id !== columnId);
+
+    needsBackup = true;
+    send("set-needs-backup", true);
+    saveBoards();
+    renderBoard();
   });
 
-  // Cancelar
   dlg.querySelector("#column-cancel-btn")
      .addEventListener("click", () => dlg.close());
 
   document.body.appendChild(dlg);
   dlg.showModal();
-  titleI.focus();
+  requestAnimationFrame(() => titleI?.focus());
 }
 
 // — DIÁLOGO: Criar/Editar CARTÃO —
 function openCardDialog(columnId = null, cardId = null) {
-  const dlg        = tCardDialog.content
-                         .cloneNode(true)
-                         .querySelector("dialog");
+  const dlg        = tCardDialog.content.cloneNode(true).querySelector("dialog");
   const sel        = dlg.querySelector("#card-column-select");
   const titleI     = dlg.querySelector("#card-title-input");
   const colorI     = dlg.querySelector("#card-color-input");
   const textColorI = dlg.querySelector("#card-text-color-input");
   const bd         = boards.find(b => b.id === activeBoardId);
+  if (!bd) return;
 
   // popula select de colunas
   const ph = new Option("Selecione coluna...", "", true, false);
@@ -645,13 +889,14 @@ function openCardDialog(columnId = null, cardId = null) {
   if (columnId) sel.value = columnId;
 
   if (cardId) {
-    // edição
     const oc = bd.columns.find(c => c.tasks.some(t => t.id === cardId));
-    const t  = oc.tasks.find(t => t.id === cardId);
-    sel.value        = oc.id;
-    titleI.value     = t.title;
-    colorI.value     = t.color;
-    textColorI.value = t.textColor || lastUsedTextColor;
+    const t  = oc?.tasks.find(t => t.id === cardId);
+    if (oc && t) {
+      sel.value        = oc.id;
+      titleI.value     = t.title;
+      colorI.value     = t.color;
+      textColorI.value = t.textColor || lastUsedTextColor;
+    }
   } else {
     // novo cartão
     colorI.value     = lastUsedCardColor;
@@ -664,7 +909,6 @@ function openCardDialog(columnId = null, cardId = null) {
   });
   dlg.addEventListener("close", () => dlg.remove());
 
-  // Salvar cartão
   dlg.querySelector("#card-save-btn")
      .addEventListener("click", () => {
        const colId    = sel.value;
@@ -672,17 +916,21 @@ function openCardDialog(columnId = null, cardId = null) {
        const colObj   = bd.columns.find(c => c.id === colId);
        const colr     = colorI.value;
        const txtColor = textColorI.value;
-       if (!txt) return;
+       if (!txt || !colObj) return;
+
+       saveState(); // snapshot antes de editar/criar cartão
 
        if (cardId) {
          // mover/editar
          const source = bd.columns.find(c => c.tasks.some(t => t.id === cardId));
-         const idx    = source.tasks.findIndex(t => t.id === cardId);
-         const [tsk]  = source.tasks.splice(idx, 1);
-         tsk.title     = txt;
-         tsk.color     = colr;
-         tsk.textColor = txtColor;
-         colObj.tasks.push(tsk);
+         const idx    = source?.tasks.findIndex(t => t.id === cardId);
+         if (source && idx >= 0) {
+           const [tsk] = source.tasks.splice(idx, 1);
+           tsk.title     = txt;
+           tsk.color     = colr;
+           tsk.textColor = txtColor;
+           colObj.tasks.splice(colObj.tasks.length, 0, tsk);
+         }
        } else {
          // novo
          colObj.tasks.push({
@@ -697,25 +945,23 @@ function openCardDialog(columnId = null, cardId = null) {
        localStorage.setItem("lastUsedCardColor", colr);
        lastUsedTextColor = txtColor;
        localStorage.setItem("lastUsedTextColor", txtColor);
+
        saveBoards();
-       renderUI();
+       renderBoard(); // só colunas/cartões
        dlg.close();
      });
 
-  // Cancelar
   dlg.querySelector("#card-cancel-btn")
      .addEventListener("click", () => dlg.close());
 
   document.body.appendChild(dlg);
   dlg.showModal();
-  titleI.focus();
+  requestAnimationFrame(() => titleI?.focus());
 }
 
 // — IMPRESSÃO: captura imagem + footer + print dialog —
 async function printWithFooter(orientation = "portrait") {
-  const user    = userId
-    ? await ipcRenderer.invoke("get-user", userId)
-    : { username: "" };
+  const user    = userId ? await invoke("get-user", userId) : { username: "" };
   const now     = new Date().toLocaleString();
   const footerTxt = `${user.username} — ${now}`;
 
@@ -756,10 +1002,7 @@ async function printWithFooter(orientation = "portrait") {
   printContainer.id = "print-container";
   document.body.appendChild(printContainer);
 
-  const canvas = await html2canvas(main, {
-    backgroundColor: "#fff",
-    scale: 1
-  });
+  const canvas = await html2canvas(main, { backgroundColor: "#fff", scale: 1 });
 
   const img = new Image();
   img.src           = canvas.toDataURL("image/png");
@@ -774,8 +1017,7 @@ async function printWithFooter(orientation = "portrait") {
 
   await new Promise((resolve, reject) => {
     img.onload  = () => resolve();
-    img.onerror = () =>
-      reject(new Error("Falha ao carregar imagem para impressão"));
+    img.onerror = () => reject(new Error("Falha ao carregar imagem para impressão"));
   });
 
   return new Promise(resolve => {
@@ -813,7 +1055,7 @@ search.addEventListener("input", () => {
   const container = document.getElementById("columns-container");
 
   if (term === "") {
-    renderUI();
+    renderBoard();
     return;
   }
 
@@ -822,9 +1064,7 @@ search.addEventListener("input", () => {
 
   boards.forEach(board => {
     board.columns.forEach(col => {
-      const hits = col.tasks.filter(t =>
-        t.title.toLowerCase().includes(term)
-      );
+      const hits = col.tasks.filter(t => t.title.toLowerCase().includes(term));
       if (!hits.length) return;
 
       const colEl = document.createElement("div");
@@ -873,7 +1113,7 @@ userName.addEventListener("click", e => {
 
 // 2) abre/fecha ao clicar com o botão direito
 userName.addEventListener("contextmenu", e => {
-  e.preventDefault();    // evita abrir o menu padrão do browser
+  e.preventDefault();
   e.stopPropagation();
   userMenu.classList.toggle("hidden");
 });
@@ -882,21 +1122,19 @@ userName.addEventListener("contextmenu", e => {
 switchUserBtn.addEventListener("click", e => {
   e.stopPropagation();
   userMenu.classList.add("hidden");
-  window.location.href = "list-users.html";
+  send("switch-user");
 });
 
 // 4) fecha ao clicar fora (botão esquerdo)
 document.addEventListener("click", e => {
-  if (!e.target.closest("#sidebar-user-name") 
-      && !e.target.closest("#user-menu")) {
+  if (!e.target.closest("#sidebar-user-name") && !e.target.closest("#user-menu")) {
     userMenu.classList.add("hidden");
   }
 });
 
 // 5) fecha ao clicar fora (botão direito)
 document.addEventListener("contextmenu", e => {
-  if (!e.target.closest("#sidebar-user-name") 
-      && !e.target.closest("#user-menu")) {
+  if (!e.target.closest("#sidebar-user-name") && !e.target.closest("#user-menu")) {
     userMenu.classList.add("hidden");
   }
 });
@@ -908,33 +1146,7 @@ document.addEventListener("keydown", e => {
   }
 });
 
-// **Saída do app**
-  document.getElementById("exit-btn")
-    .addEventListener("click", () => window.close());
-
-  document.getElementById("board-select")
-    .addEventListener("change", e => {
-      activeBoardId = e.target.value;
-      renderUI();
-    });
-
-  document.getElementById("edit-board-btn")
-    .addEventListener("click", () => {
-      if (!boards.length) return showMessage("Nenhum quadro para editar", true);
-      openBoardDialog(activeBoardId);
-    });
-
-  document.getElementById("delete-board-btn")
-    .addEventListener("click", () => {
-      if (!boards.length) return showMessage("Nenhum quadro para excluir", true);
-      deleteBoard(activeBoardId);
-    });
-
-  ipcRenderer.on("save-result", (_e, ok) => {
-    showMessage(ok ? "Alterações salvas" : "Erro ao salvar", !ok);
-  });
-
-// 🎨 Lista de fontes do Windows
+// — Tipografia: fontes e tamanho —
 const windowsFonts = [
   "Arial", "Arial Black", "Bahnschrift", "Bahnschrift Light", "Calibri", "Cambria", "Cambria Math",
   "Candara", "Comic Sans MS", "Consolas", "Constantia", "Corbel", "Courier New", "Ebrima",
@@ -948,11 +1160,9 @@ const windowsFonts = [
   "Verdana", "Webdings", "Wingdings", "Wingdings 2", "Wingdings 3", "Yu Gothic", "Yu Gothic UI"
 ];
 
-// 🔤 Font selector toggle
 const fontToggleBtn = document.getElementById('font-toggle-btn');
 const fontSelect = document.getElementById('font-select');
 
-// Preenche o seletor com as fontes
 windowsFonts.forEach(font => {
   const option = document.createElement("option");
   option.value = font;
@@ -961,7 +1171,6 @@ windowsFonts.forEach(font => {
   fontSelect.appendChild(option);
 });
 
-// Toggle de visibilidade do seletor
 fontToggleBtn.addEventListener('click', () => {
   const isOpen = fontSelect.classList.toggle('show');
   fontSelect.classList.toggle('hidden', !isOpen);
@@ -969,7 +1178,6 @@ fontToggleBtn.addEventListener('click', () => {
   if (isOpen) fontSelect.focus();
 });
 
-// Fecha seletor ao clicar fora
 document.addEventListener('click', (e) => {
   if (!fontToggleBtn.contains(e.target) && !fontSelect.contains(e.target)) {
     fontSelect.classList.add('hidden');
@@ -978,14 +1186,12 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Aplica fonte salva
 const savedFont = localStorage.getItem("appFontFamily");
 if (savedFont) {
   document.documentElement.style.setProperty("--app-font-family", `"${savedFont}", sans-serif`);
   fontSelect.value = savedFont;
 }
 
-// Aplica nova fonte ao mudar
 fontSelect.addEventListener("change", (e) => {
   const selected = e.target.value || "Segoe UI";
   const finalFont = `"${selected}", sans-serif`;
@@ -993,12 +1199,11 @@ fontSelect.addEventListener("change", (e) => {
   localStorage.setItem("appFontFamily", selected);
 });
 
-// 🔠 Font size controls
+// — Font size controls —
 const sizeBtn     = document.getElementById('font-size-toggle-btn');
 const sizeInput   = document.getElementById('font-size-input');
 const sizeDisplay = document.getElementById('font-size-display');
 
-// Carrega tamanho salvo
 const savedSize = localStorage.getItem('appFontSize');
 if (savedSize) {
   document.documentElement.style.setProperty('--app-font-size', savedSize);
@@ -1006,7 +1211,6 @@ if (savedSize) {
   sizeDisplay.textContent = savedSize;
 }
 
-// Toggle de visibilidade do controle de tamanho
 sizeBtn.addEventListener('click', () => {
   const isOpen = sizeInput.classList.toggle('show');
   sizeDisplay.classList.toggle('show', isOpen);
@@ -1016,35 +1220,9 @@ sizeBtn.addEventListener('click', () => {
   if (isOpen) sizeInput.focus();
 });
 
-// Atualiza tamanho ao mover slider
 sizeInput.addEventListener('input', e => {
   const px = `${e.target.value}px`;
   document.documentElement.style.setProperty('--app-font-size', px);
   sizeDisplay.textContent = px;
   localStorage.setItem('appFontSize', px);
-});
-
-// Fecha controle de tamanho ao clicar fora
-document.addEventListener('click', e => {
-  if (!sizeBtn.contains(e.target) && !sizeInput.contains(e.target)) {
-    sizeInput.classList.add('hidden');
-    sizeDisplay.classList.add('hidden');
-    sizeInput.classList.remove('show');
-    sizeDisplay.classList.remove('show');
-    sizeBtn.setAttribute('aria-expanded', 'false');
-  }
-});
-
-// 7) confirmar com Enter quando o menu estiver aberto
-document.addEventListener("keydown", e => {
-  if (e.key === "Enter" && !userMenu.classList.contains("hidden")) {
-    e.preventDefault();            // evita qualquer outro comportamento
-    switchUserBtn.click();         // dispara a ação de confirmar
-  }
-});
-
-// 8) cancelar com botão direito enquanto o menu estiver aberto
-userMenu.addEventListener("contextmenu", e => {
-  e.preventDefault();              // suprime o menu nativo
-  userMenu.classList.add("hidden"); // fecha o menu customizado
 });

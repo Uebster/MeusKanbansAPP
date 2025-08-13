@@ -10,7 +10,8 @@
 
   <!-- Estilos específicos da listagem -->
   <link rel="stylesheet" href="./list-users.css" />
-  <script src="./universal-ui-controls.js"></script>
+  <script defer src="./universal-ui-controls.js"></script>
+  <script defer src="./list-users.js" defer></script>
 </head>
 <body>
   <div class="container">
@@ -20,10 +21,11 @@
 </div>
     </header>
     <div class="actions-top">
-<div button id="toggleTheme" title="Alternar tema">🌓 Alternar tema</button>
-</div></div>
+<button id="toggleTheme" title="Alternar tema">🌓 Alternar tema</button>
+
+</div>
 <div class="actions-top">
-      <div button id="btn-new-user">Criar Usuário</button></div></div>
+      <button id="btn-new-user">Criar Usuário</button></div>
       
     <table id="users-table">
       <thead>
@@ -45,6 +47,6 @@
     <p id="feedback" class="feedback"></p>
   </div>
 
-  <script src="./list-users.js"></script>
+  
 </body>
 </html>

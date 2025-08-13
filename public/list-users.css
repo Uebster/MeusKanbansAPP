@@ -169,11 +169,12 @@ select {
 
 .modal-box {
   background: var(--bg-column);
-  border: 1px solid var(--border);
+  border: 5px solid var(--border);
+  font-size: 1.4rem;
   color: var(--text);
   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   border-radius: 8px;
-  padding: 1.5rem;
+  padding: 1rem;
   width: 320px;
   text-align: center;
 }
@@ -181,8 +182,9 @@ select {
 .modal-box input {
   width:100%;
   padding:0.5rem;
-  margin:0.5rem 0;
+  margin:1rem 0;
   background: var(--bg-column);
-  border:1px solid var(--border);
+  border:3px solid var(--border);
   color: var(--text);
 }
+

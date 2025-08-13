@@ -1,4 +1,3 @@
-// main.js
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path    = require("path");
 const storage = require("./storage.js");
@@ -6,55 +5,46 @@ const storage = require("./storage.js");
 let listWindow  = null;
 let userWindow  = null;
 let indexWindow = null;
+let needsBackup = false;         // usado pelos renderers
+let loginProcessando = false;    // blindagem contra duplo login
 
-/**
- * Janela de listagem de usuários (public/list-users.html)
- */
+// Configurações comuns — compatíveis com preload.js e window.electronAPI
+const webPrefs = {
+  preload: path.join(__dirname, "preload.js"),
+  nodeIntegration: false,
+  contextIsolation: true
+};
+
 function createListWindow() {
   listWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     autoHideMenuBar: true,
-    webPreferences: { nodeIntegration: true, contextIsolation: false }
+    webPreferences: webPrefs
   });
-
-  listWindow.loadFile(
-    path.join(__dirname, "public", "list-users.html")
-  );
-
+  listWindow.loadFile(path.join(__dirname, "public", "list-users.html"));
   listWindow.on("closed", () => (listWindow = null));
 }
 
-/**
- * Janela modal de criação/edição de usuário
- */
 function createUserWindow(userId = null) {
-  if (userWindow) {
-    userWindow.focus();
-    return;
-  }
+  if (userWindow) { userWindow.focus(); return; }
 
   userWindow = new BrowserWindow({
     width: 400,
     height: 500,
-    parent: listWindow,
+    parent: listWindow || indexWindow || null,
     modal: true,
     autoHideMenuBar: true,
-    webPreferences: { nodeIntegration: true, contextIsolation: false }
+    webPreferences: webPrefs
   });
 
-  userWindow.loadFile(
-    path.join(__dirname, "public", "create-user.html")
-  );
+  userWindow.loadFile(path.join(__dirname, "public", "create-user.html"));
 
   userWindow.webContents.once("did-finish-load", async () => {
     let user = null;
     if (userId) {
-      try {
-        user = await storage.getUserById(userId);
-      } catch (err) {
-        console.error("Erro ao carregar usuário:", err);
-      }
+      try { user = await storage.getUserById(userId); }
+      catch (err) { console.error("Erro ao carregar usuário:", err); }
     }
     userWindow.webContents.send("load-user", user);
   });
@@ -62,16 +52,12 @@ function createUserWindow(userId = null) {
   userWindow.on("closed", () => (userWindow = null));
 }
 
-/**
- * Janela principal do Kanban (public/index.html)
- * Recebe userId via query string
- */
 function createIndexWindow(selectedUserId) {
   indexWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     autoHideMenuBar: true,
-    webPreferences: { nodeIntegration: true, contextIsolation: false }
+    webPreferences: webPrefs
   });
 
   indexWindow.loadFile(
@@ -79,30 +65,39 @@ function createIndexWindow(selectedUserId) {
     { query: { userId: selectedUserId } }
   );
   indexWindow.maximize();
-  indexWindow.on("closed", () => (indexWindow = null));
+
+  // Sempre que a janela principal fechar, zera a flag de login
+  indexWindow.on("closed", () => {
+    indexWindow = null;
+    loginProcessando = false;
+  });
 }
 
-// Ciclo de vida da aplicação
 app.whenReady().then(createListWindow);
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createListWindow();
+  if (BrowserWindow.getAllWindows().length === 0) createListWindow();
+});
+
+app.on("before-quit", async () => {
+  if (needsBackup) {
+    try {
+      await storage.backupBoards();
+      console.log("Backup feito antes de sair.");
+    } catch (err) {
+      console.error("Erro no backup ao sair:", err);
+    }
   }
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+  if (process.platform !== "darwin") app.quit();
 });
 
-// --- IPC: Fluxo de Usuários ---
-ipcMain.on("open-create-user", (_evt, { id }) => {
-  createUserWindow(id);
-});
+// --- IPC: Usuários ---
+ipcMain.on("open-create-user", (_evt, { id }) => createUserWindow(id));
 
-ipcMain.on("get-all-users", async event => {
+ipcMain.on("get-all-users", async (event) => {
   try {
     const users = await storage.getAllUsers();
     event.reply("get-all-users-reply", users);
@@ -150,65 +145,47 @@ ipcMain.on("delete-user", async (event, { id }) => {
   }
 });
 
-// Após selecionar usuário na lista, fecha essa janela e abre o Kanban
+// Seleção de usuário — fecha list e abre index (com blindagem)
 ipcMain.on("user-selected", (_evt, userId) => {
-  if (listWindow) {
-    listWindow.close();
-    listWindow = null;
-  }
+  if (loginProcessando) return;
+  loginProcessando = true;
+
+  if (listWindow) { listWindow.close(); listWindow = null; }
   createIndexWindow(userId);
+
+  // Se por algum motivo a janela não existir, libera a flag
+  if (!indexWindow) loginProcessando = false;
 });
 
-// --- Novo handler para expor dados do usuário ao renderer ---
-ipcMain.handle("get-user", async (_evt, userId) => {
-  try {
-    const user = await storage.getUserById(userId);
-    return user || { username: "Desconhecido" };
-  } catch {
-    return { username: "Desconhecido" };
+// Trocar usuário vindo do index — fecha index e reabre list
+ipcMain.on("switch-user", () => {
+  if (indexWindow) {
+    indexWindow.close(); // on('closed') já zera loginProcessando
+    indexWindow = null;
   }
+  createListWindow();
 });
 
-// --- IPC: Fluxo de Kanban ORIGINAL ---
-// Mantido para referência, mas estes podem ser comentados para evitar dupla chamada:
-//
-// ipcMain.on("load-boards", async event => {
-//   try {
-//     const boards = await storage.getAllBoards();
-//     event.reply("load-result", boards);
-//   } catch {
-//     event.reply("load-result", []);
-//   }
-// });
-//
-// ipcMain.on("save-boards", async (event, boards) => {
-//   try {
-//     if (typeof storage.backupBoards === "function") {
-//       await storage.backupBoards();
-//     }
-//     await storage.saveBoards(boards);
-//     event.reply("save-result", true);
-//   } catch (err) {
-//     console.error("Erro ao salvar quadros:", err);
-//     event.reply("save-result", false);
-//   }
-// });
+// --- IPC: Dados do usuário ao renderer ---
+ipcMain.handle("get-user", async (_evt, userId) => {
+  try { return await storage.getUserById(userId); }
+  catch { return null; }
+});
 
-// --- IPC: Fluxo de Kanban AJUSTADO por usuário ---
+// --- IPC: Quadros por usuário ---
 ipcMain.on("load-boards", async (event, userId) => {
   try {
     const boards = await storage.getBoardsByUser(userId);
     event.reply("load-result", boards);
-  } catch {
+  } catch (err) {
+    console.error("Erro em load-boards:", err);
     event.reply("load-result", []);
   }
 });
 
 ipcMain.on("save-boards", async (event, boards, userId) => {
   try {
-    if (typeof storage.backupBoards === "function") {
-      await storage.backupBoards();
-    }
+    await storage.backupBoards();
     await storage.saveBoardsByUser(userId, boards);
     event.reply("save-result", true);
   } catch (err) {
@@ -217,12 +194,6 @@ ipcMain.on("save-boards", async (event, boards, userId) => {
   }
 });
 
-function createWindow() {
-  const win = new BrowserWindow({
-    width: 800,
-    height: 600,
-    icon: path.join(__dirname, 'assets', 'MeusKanbans.ico')
-  });
-
-  win.loadFile('index.html');
-}
+ipcMain.on("set-needs-backup", (_e, val) => {
+  needsBackup = !!val;
+});

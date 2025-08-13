@@ -12,7 +12,7 @@
 
   <style>
     body, button, input, textarea, select {
-      font-family: 'Inter', sans-serif;
+      font-family: var(--app-font-family);
     }
 
     /* Color picker */
@@ -44,9 +44,9 @@
   </style>
 
   <link rel="stylesheet" href="style.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script defer src="./universal-ui-controls.js"></script>
   <script defer src="script.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <script src="./universal-ui-controls.js"></script>
 </head>
 <body>
 
@@ -218,6 +218,18 @@
       <button id="card-delete-btn">🗑️ Excluir</button>
     </div>
   </template>
+
+  <!-- ▶️ Diálogo de confirmação -->
+<template id="confirm-dialog">
+  <dialog id="confirm-dialog">
+    <h3 id="confirm-title">Confirmar ação</h3>
+    <p id="confirm-message">Tem certeza que deseja continuar?</p>
+    <menu class="modal-actions">
+      <button id="confirm-ok-btn">Confirmar</button>
+      <button id="confirm-cancel-btn">Cancelar</button>
+    </menu>
+  </dialog>
+</template>
 
 </body>
 </html>

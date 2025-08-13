@@ -1,5 +1,16 @@
 ;(function() {
-  // Helpers
+// 👇 ADICIONAR ISSO UMA ÚNICA VEZ NO TOPO
+const isFormField = el =>
+  !!el && (
+    ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) ||
+    el.isContentEditable
+  );
+
+const hasActiveModal = () =>
+  !!(document.querySelector('dialog[open]') ||
+     document.querySelector('.modal.is-open, [data-modal-open="true"]'));
+
+  // Helpers (primeiro bloco)
   const getOpenDialog = () => document.querySelector('dialog[open]');
   const getCreateModal = () => document.getElementById('create-user-modal');
   const getOpenMenu = () =>
@@ -8,7 +19,12 @@
     );
 
   // 1) Tecla Enter → aciona CONFIRMAR
-  document.addEventListener('keydown', e => {
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== 'Escape') return;
+
+  // Só ignorar digitação se NÃO houver modal ativo
+  if (!hasActiveModal() && isFormField(e.target)) return;
+
     if (e.key !== 'Enter') return;
 
     // 1.1) Diálogo <dialog>
@@ -40,8 +56,12 @@
   });
 
   // 2) Tecla Escape → aciona CANCELAR
-  document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape') return;
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== 'Escape') return;
+
+  // Só ignorar digitação se NÃO houver modal ativo
+  if (!hasActiveModal() && isFormField(e.target)) return;
+
 
     // 2.1) Diálogo <dialog>
     const dialog = getOpenDialog();
@@ -130,121 +150,110 @@
   });
 })();
 
-// universal-ui-controls.js
+// universal-ui-controls.js (segundo bloco original, preservado e corrigido)
 ;(function() {
-  // → AGUARDA O DOM
   document.addEventListener('DOMContentLoaded', () => {
-    // Cache dos modais customizados
-    const loginModal       = document.getElementById('login-modal');
-    const deleteModal      = document.getElementById('delete-modal');
-    const loginConfirmBtn  = document.getElementById('confirm-login');
-    const loginCancelBtn   = document.getElementById('cancel-login');
-    const deleteConfirmBtn = document.getElementById('confirm-delete');
-    const deleteCancelBtn  = document.getElementById('cancel-delete');
+    // Cache dos modais customizados (podem não existir em algumas telas)
+    const loginModal       = document.getElementById('login-modal') || null;
+    const deleteModal      = document.getElementById('delete-modal') || null;
+    const loginConfirmBtn  = document.getElementById('confirm-login') || null;
+    const loginCancelBtn   = document.getElementById('cancel-login') || null;
+    const deleteConfirmBtn = document.getElementById('confirm-delete') || null;
+    const deleteCancelBtn  = document.getElementById('cancel-delete') || null;
 
-    // Helpers já existentes
-    const getOpenDialog   = () => {
-      const dialogs = Array.from(document.querySelectorAll('dialog'));
-      return dialogs.find(d => d.open);
-    };
-    const getCreateModal = () => document.getElementById('create-user-modal');
-    const getOpenMenu    = () =>
-      document.querySelector(
-        '#user-menu:not(.hidden), .column-menu:not(.hidden), .card-menu:not(.hidden)'
-      );
+// Helpers
+const getOpenDialog = () => {
+  const dialogs = Array.from(document.querySelectorAll('dialog'));
+  return dialogs.find(d => d.open === true) || null;
+};
+const getCreateModal = () => document.getElementById('create-user-modal');
+const isFormField = el =>
+  !!el && (
+    ['INPUT','TEXTAREA','SELECT'].includes(el.tagName) || el.isContentEditable
+  );
+const isFlexVisible = el =>
+  !!el && getComputedStyle(el).display === 'flex';
+const getOpenMenu = () =>
+  document.querySelector(
+    '#user-menu:not(.hidden), .column-menu:not(.hidden), .card-menu:not(.hidden)'
+  );
 
-    // 1) ENTER → CONFIRMAR (modais nativos, create-user, login, delete, list-users)
-    document.addEventListener('keydown', e => {
-      // 1.1) Login Modal aberto?
-      if (
-        loginModal &&
-        getComputedStyle(loginModal).display === 'flex'
-      ) {
-        if (e.key === 'Enter') {
-          e.preventDefault(); loginConfirmBtn.click(); return;
-        }
-        if (e.key === 'Escape') {
-          e.preventDefault(); loginCancelBtn.click();  return;
-        }
+// 1) ENTER/ESC → CONFIRMAR/CANCELAR (ordem de prioridade: dialog > login > delete > create-user > list-users)
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== 'Escape') return;
+
+  const dialog     = getOpenDialog();
+  const loginOpen  = isFlexVisible(loginModal);
+  const deleteOpen = isFlexVisible(deleteModal);
+
+  // Se não há modal/dialog aberto, não intercepta campos de formulário
+  if (!dialog && !loginOpen && !deleteOpen) {
+    if (isFormField(e.target)) return;
+  }
+
+  // 1.1) Dialog <dialog> nativo
+  if (dialog) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const saveBtn =
+        dialog.querySelector('button[id$="-save-btn"]') ||
+        dialog.querySelector('button[type="submit"]');
+      saveBtn?.click();
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      const cancelBtn = dialog.querySelector('button[id$="-cancel-btn"]');
+      cancelBtn ? cancelBtn.click() : dialog.close();
+      return;
+    }
+  }
+
+  // daqui pra baixo continuam os casos loginModal, deleteModal, etc...
+
+      // Login Modal aberto?
+      if (loginModal && getComputedStyle(loginModal).display === 'flex') {
+        if (e.key === 'Enter') { e.preventDefault(); loginConfirmBtn?.click(); return; }
+        if (e.key === 'Escape') { e.preventDefault(); loginCancelBtn?.click();  return; }
       }
 
-      // 1.2) Delete Modal aberto?
-      if (
-        deleteModal &&
-        getComputedStyle(deleteModal).display === 'flex'
-      ) {
-        if (e.key === 'Enter') {
-          e.preventDefault(); deleteConfirmBtn.click(); return;
-        }
-        if (e.key === 'Escape') {
-          e.preventDefault(); deleteCancelBtn.click();  return;
-        }
+      // Delete Modal aberto?
+      if (deleteModal && getComputedStyle(deleteModal).display === 'flex') {
+        if (e.key === 'Enter') { e.preventDefault(); deleteConfirmBtn?.click(); return; }
+        if (e.key === 'Escape') { e.preventDefault(); deleteCancelBtn?.click();  return; }
       }
 
-      // 1.3) <dialog> nativo
-      const dialog = getOpenDialog();
-      if (dialog && e.key === 'Enter') {
-        e.preventDefault();
-        const saveBtn =
-          dialog.querySelector('button[id$="-save-btn"]') ||
-          dialog.querySelector('button[type="submit"]');
-        if (saveBtn) saveBtn.click();
-        return;
-      }
-      if (dialog && e.key === 'Escape') {
-        e.preventDefault();
-        const cancelBtn = dialog.querySelector('button[id$="-cancel-btn"]');
-        if (cancelBtn) cancelBtn.click();
-        else dialog.close();
-        return;
-      }
-
-      // 1.4) Modal criar/editar usuário (página separada)
+      // Create-user
       const createModal = getCreateModal();
       if (createModal && createModal.contains(document.activeElement)) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          document.getElementById('btn-create').click();
-          return;
-        }
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          document.getElementById('cancel-btn').click();
-          return;
-        }
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btn-create')?.click(); return; }
+        if (e.key === 'Escape') { e.preventDefault(); document.getElementById('cancel-btn')?.click(); return; }
+        if (isFormField(e.target)) return;
       }
 
-      // 1.5) Tela de list-users (botão “Login”)
+      // Tela de list-users (botão “Login”), só se não houver login modal aberto
       const confirmUser = document.getElementById('confirm-user');
       if (
         e.key === 'Enter' &&
         confirmUser &&
         !confirmUser.disabled &&
-        getComputedStyle(loginModal).display !== 'flex'
+        !(loginModal && getComputedStyle(loginModal).display === 'flex')
       ) {
         e.preventDefault();
         confirmUser.click();
       }
     });
 
-    // 2) CLICK DIREITO → CANCELAR em login, delete, dialogs, create-user, menus
+    // 2) CLICK DIREITO
     document.addEventListener('contextmenu', e => {
       // Login Modal
-      if (
-        loginModal &&
-        getComputedStyle(loginModal).display === 'flex' &&
-        loginModal.contains(e.target)
-      ) {
-        e.preventDefault(); loginCancelBtn.click(); return;
+      if (loginModal && getComputedStyle(loginModal).display === 'flex' && loginModal.contains(e.target)) {
+        e.preventDefault(); loginCancelBtn?.click(); return;
       }
 
       // Delete Modal
-      if (
-        deleteModal &&
-        getComputedStyle(deleteModal).display === 'flex' &&
-        deleteModal.contains(e.target)
-      ) {
-        e.preventDefault(); deleteCancelBtn.click(); return;
+      if (deleteModal && getComputedStyle(deleteModal).display === 'flex' && deleteModal.contains(e.target)) {
+        e.preventDefault(); deleteCancelBtn?.click(); return;
       }
 
       // Dialog nativo
@@ -252,20 +261,19 @@
       if (dialog && dialog.contains(e.target)) {
         e.preventDefault();
         const cancelBtn = dialog.querySelector('button[id$="-cancel-btn"]');
-        if (cancelBtn) cancelBtn.click();
-        else dialog.close();
+        cancelBtn ? cancelBtn.click() : dialog.close();
         return;
       }
 
-      // Modal criar/editar usuário
+      // Create-user
       const createModal = getCreateModal();
       if (createModal && createModal.contains(e.target)) {
         e.preventDefault();
-        document.getElementById('cancel-btn').click();
+        document.getElementById('cancel-btn')?.click();
         return;
       }
 
-      // Menu suspenso (sidebar, coluna, cartão)
+      // Menu suspenso
       const menu = getOpenMenu();
       if (menu && menu.contains(e.target)) {
         e.preventDefault();
@@ -273,49 +281,36 @@
       }
     });
 
-    // 3) CLIQUE FORA → CANCELAR/FECHAR modais e menus
+    // 3) CLIQUE FORA
     document.addEventListener('mousedown', e => {
       // Login Modal
-      if (
-        loginModal &&
-        getComputedStyle(loginModal).display === 'flex' &&
-        !e.target.closest('.modal-box')
-      ) {
-        loginCancelBtn.click(); return;
+      if (loginModal && getComputedStyle(loginModal).display === 'flex' && !e.target.closest('.modal-box')) {
+        loginCancelBtn?.click(); return;
       }
 
       // Delete Modal
-      if (
-        deleteModal &&
-        getComputedStyle(deleteModal).display === 'flex' &&
-        !e.target.closest('.modal-box')
-      ) {
-        deleteCancelBtn.click(); return;
+      if (deleteModal && getComputedStyle(deleteModal).display === 'flex' && !e.target.closest('.modal-box')) {
+        deleteCancelBtn?.click(); return;
       }
 
       // Dialog nativo
       const dialog = getOpenDialog();
       if (dialog && !dialog.contains(e.target)) {
         const cancelBtn = dialog.querySelector('button[id$="-cancel-btn"]');
-        if (cancelBtn) cancelBtn.click();
-        else dialog.close();
+        cancelBtn ? cancelBtn.click() : dialog.close();
         return;
       }
 
-      // Modal criar/editar usuário
+      // Create-user
       const createModal = getCreateModal();
       if (createModal && !createModal.contains(e.target)) {
-        document.getElementById('cancel-btn').click();
+        document.getElementById('cancel-btn')?.click();
         return;
       }
 
       // Menus de contexto
       const menu = getOpenMenu();
-      if (
-        menu &&
-        !menu.contains(e.target) &&
-        !e.target.closest('#sidebar-user-name')
-      ) {
+      if (menu && !menu.contains(e.target) && !e.target.closest('#sidebar-user-name')) {
         menu.classList.add('hidden');
       }
     });

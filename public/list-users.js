@@ -1,12 +1,13 @@
 // public/list-users.js
-const { ipcRenderer } = require('electron');
-const MASTER_PASSWORD = "87654"; // ← ajuste para a sua senha master
+
+const { send, on, invoke } = window.electronAPI;
+const MASTER_PASSWORD = "87654"; // ajuste para a sua senha master
 
 // ===== MODAL DE LOGIN =====
 const loginModal = document.createElement("div");
 loginModal.id = "login-modal";
 Object.assign(loginModal.style, {
-  display:         "none",          // só aparece quando usarmos loginModal.style.display = 'flex'
+  display:         "none",
   position:        "fixed",
   top:             "0",
   left:            "0",
@@ -57,74 +58,80 @@ deleteModal.innerHTML = `
 document.body.appendChild(deleteModal);
 
 document.addEventListener("DOMContentLoaded", () => {
-  // cache elementos dos modais
-  const inputLogin     = document.getElementById("login-password");
+  // Cache modais
+  const inputLogin      = document.getElementById("login-password");
   const btnConfirmLogin = document.getElementById("confirm-login");
   const btnCancelLogin  = document.getElementById("cancel-login");
   const loginFeedback   = document.getElementById("login-feedback");
 
-  const inputDelete    = document.getElementById("delete-password");
-  const btnConfirmDel  = document.getElementById("confirm-delete");
-  const btnCancelDel   = document.getElementById("cancel-delete");
-  const deleteFeedback = document.getElementById("delete-feedback");
+  const inputDelete     = document.getElementById("delete-password");
+  const btnConfirmDel   = document.getElementById("confirm-delete");
+  const btnCancelDel    = document.getElementById("cancel-delete");
+  const deleteFeedback  = document.getElementById("delete-feedback");
 
-  let selectedUserId   = null;
-  let userToDeleteId   = null;
-  let userToEditId     = null;
+  let selectedUserId = null;
+  let userToDeleteId = null;
+  let userToEditId   = null;
+  let loginEmAndamento = false;
 
-  // FECHAR / CANCELAR modais
+  // Fechar / cancelar modais
   btnCancelLogin.addEventListener("click", () => {
-    loginModal.style.display = "none";
-    inputLogin.value = "";
-    loginFeedback.textContent = "";
-  });
+  loginModal.style.display = "none";
+  inputLogin.value = "";
+  loginFeedback.textContent = "";
+  loginEmAndamento = false;        // ⬅️ reset
+  btnConfirmLogin.disabled = false; // ⬅️ reset
+});
   btnCancelDel.addEventListener("click", () => {
     deleteModal.style.display = "none";
     inputDelete.value = "";
     deleteFeedback.textContent = "";
   });
 
-  // CONFIRMAR LOGIN
+  // Confirmar LOGIN
 btnConfirmLogin.addEventListener("click", async () => {
+  if (loginEmAndamento) return;
+  loginEmAndamento = true;
+  btnConfirmLogin.disabled = true;
+
   const pwd = inputLogin.value.trim();
   if (!pwd) {
     loginFeedback.textContent = "Digite a senha.";
+    loginEmAndamento = false;
+    btnConfirmLogin.disabled = false;
     return;
   }
   try {
-    // escolhe o ID certo conforme o modo
-    const idToCheck = loginModal.dataset.mode === "edit"
-      ? userToEditId
-      : selectedUserId;
+    const idToCheck = loginModal.dataset.mode === "edit" ? userToEditId : selectedUserId;
+    const user = await invoke("get-user", idToCheck);
 
-    const user = await ipcRenderer.invoke("get-user", idToCheck);
-
-    // permite também usar MASTER_PASSWORD para override
-    if (pwd === user.password || pwd === MASTER_PASSWORD) {
+    if ((user && pwd === user.password) || pwd === MASTER_PASSWORD) {
       loginModal.style.display = "none";
       inputLogin.value = "";
       loginFeedback.textContent = "";
-
       if (loginModal.dataset.mode === "edit") {
-        // abre a janela de edição
-        ipcRenderer.send("open-create-user", { id: userToEditId });
+        send("open-create-user", { id: userToEditId });
         userToEditId = null;
       } else {
-        // fluxo normal de login para Kanban
-        ipcRenderer.send("user-selected", selectedUserId);
+        send("user-selected", selectedUserId);
       }
       loginModal.dataset.mode = "";
+      // não reabilita — vamos trocar de janela
     } else {
       loginFeedback.textContent = "Senha incorreta. Tente novamente.";
       inputLogin.value = "";
+      loginEmAndamento = false;
+      btnConfirmLogin.disabled = false;
     }
   } catch (err) {
     loginFeedback.textContent = "Erro ao validar usuário.";
     console.error(err);
+    loginEmAndamento = false;
+    btnConfirmLogin.disabled = false;
   }
 });
 
-  // CONFIRMAR EXCLUSÃO
+  // Confirmar EXCLUSÃO
   btnConfirmDel.addEventListener("click", async () => {
     const pwd = inputDelete.value.trim();
     if (!pwd) {
@@ -132,9 +139,9 @@ btnConfirmLogin.addEventListener("click", async () => {
       return;
     }
     try {
-      const user = await ipcRenderer.invoke("get-user", userToDeleteId);
+      const user = await invoke("get-user", userToDeleteId);
       if (pwd === user.password || pwd === MASTER_PASSWORD) {
-        ipcRenderer.send("delete-user", { id: userToDeleteId });
+        send("delete-user", { id: userToDeleteId });
         deleteModal.style.display = "none";
         inputDelete.value = "";
       } else {
@@ -147,7 +154,7 @@ btnConfirmLogin.addEventListener("click", async () => {
     }
   });
 
-  // ELEMENTOS PRINCIPAIS
+  // Elementos principais
   const btnNewUser  = document.getElementById("btn-new-user");
   const tableBody   = document.querySelector("#users-table tbody");
   const feedback    = document.getElementById("feedback");
@@ -163,15 +170,13 @@ btnConfirmLogin.addEventListener("click", async () => {
     localStorage.setItem("theme", isLight ? "light" : "dark");
   });
 
-  // Função para limpar seleção
+  // Reseta seleção
   const resetSelection = () => {
     const sel = tableBody.querySelector("tr.selected");
     if (sel) sel.classList.remove("selected");
     selectedUserId = null;
     confirmBtn.disabled = true;
   };
-
-  // Reset ao clicar fora
   document.addEventListener("click", e => {
     const ignore = e.target.closest("#users-table")
                 || e.target.closest("#login-modal .modal-box")
@@ -187,31 +192,32 @@ btnConfirmLogin.addEventListener("click", async () => {
     if (!ignore) resetSelection();
   });
 
-  // Carrega usuários
-  ipcRenderer.send("get-all-users");
-  ipcRenderer.on("get-all-users-reply", (_e, users) => {
-    tableBody.innerHTML = "";
-    resetSelection();
+  // Carrega lista de usuários
+// Carrega lista de usuários
+send("get-all-users");
+on("get-all-users-reply", users => {
+  tableBody.innerHTML = "";
+  resetSelection();
+  if (!users || users.length === 0) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 3;
+    td.textContent = "Nenhum usuário cadastrado.";
+    tr.appendChild(td);
+    tableBody.appendChild(tr);
+    return;
+  }
 
-    if (!users || users.length === 0) {
-      const tr = document.createElement("tr");
-      const td = document.createElement("td");
-      td.colSpan = 3;
-      td.textContent = "Nenhum usuário cadastrado.";
-      tr.appendChild(td);
-      tableBody.appendChild(tr);
-      return;
-    }
+  users.forEach(user => {
+    const tr = document.createElement("tr");
 
-    users.forEach(user => {
-      const tr = document.createElement("tr");
 
       // ID
       const tdId = document.createElement("td");
       tdId.textContent = user.id;
       tr.appendChild(tdId);
 
-      // Usuário (seleção)
+      // Usuário
       const tdUser = document.createElement("td");
       tdUser.textContent = user.username;
       tdUser.style.cursor = "pointer";
@@ -224,21 +230,20 @@ btnConfirmLogin.addEventListener("click", async () => {
       });
       tr.appendChild(tdUser);
 
-      // Ações (✏️ 🗑️)
+      // Ações
       const tdActions = document.createElement("td");
       const btnEdit   = document.createElement("button");
       const btnDelete = document.createElement("button");
 
       btnEdit.textContent = "Editar";
       btnEdit.classList.add("action-button");
-btnEdit.addEventListener("click", () => {
-  // agenda a edição e requer senha antes de abrir
-  userToEditId = user.id;
-  loginModal.dataset.mode   = "edit";
-  loginFeedback.textContent = "";
-  loginModal.style.display  = "flex";
-  inputLogin.focus();
-});
+      btnEdit.addEventListener("click", () => {
+        userToEditId = user.id;
+        loginModal.dataset.mode   = "edit";
+        loginFeedback.textContent = "";
+        loginModal.style.display  = "flex";
+        inputLogin.focus();
+      });
 
       btnDelete.textContent = "Excluir";
       btnDelete.classList.add("action-button");
@@ -256,10 +261,10 @@ btnEdit.addEventListener("click", () => {
 
   // Novo usuário
   btnNewUser.addEventListener("click", () => {
-    ipcRenderer.send("open-create-user", { id: null });
+    send("open-create-user", { id: null });
   });
 
-  // Abre modal de login
+  // Confirma seleção
   confirmBtn.addEventListener("click", () => {
     if (!selectedUserId) {
       feedback.textContent = "Selecione um usuário.";
@@ -276,12 +281,12 @@ btnEdit.addEventListener("click", () => {
     feedback.style.color = success ? "green" : "red";
     if (success) {
       setTimeout(() => {
-        ipcRenderer.send("get-all-users");
+        send("get-all-users");
         feedback.textContent = "";
       }, 500);
     }
   }
-  ipcRenderer.on("create-user-reply",  (_e, resp) => showFeedback(resp));
-  ipcRenderer.on("update-user-reply",  (_e, resp) => showFeedback(resp));
-  ipcRenderer.on("delete-user-reply",  (_e, resp) => showFeedback(resp));
+  on("create-user-reply", showFeedback);
+  on("update-user-reply", showFeedback);
+  on("delete-user-reply", showFeedback);
 });

@@ -333,23 +333,20 @@ dialog {
   color: var(--text);
   border: none;
   border-radius: 8px;
-  font-size: var(--dialog-font);
+  font-size: var(--dialog-font-size);
   transition: opacity var(--transition-fast);
-}
-dialog.large-dialog {
-  max-width: var(--dialog-width);
 }
 dialog::backdrop {
   background: rgba(0,0,0,0.6);
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 .form-group label {
   display: block;
   margin-bottom: 8px;
-  font-size: 1rem;
+  font-size: 1.2rem;
   color: var(--text);
 }
 .form-group input[type="text"],
@@ -361,7 +358,6 @@ dialog::backdrop {
   background-color: var(--bg-column);
   color: var(--text);
   font-size: 1rem;
-
 }
 
 #searchInput {
@@ -545,7 +541,7 @@ dialog::backdrop {
 .column-menu {
   position: absolute;
   background-color: var(--bg-board);
-  border: 1px solid var(--border);
+  border: 3px solid var(--border);
   border-radius: 6px;
   padding: 8px;
   display: flex;
@@ -556,8 +552,8 @@ dialog::backdrop {
 }
 .card-menu button,
 .column-menu button {
-  background: none;
   border: none;
+  background: none;
   color: var(--text);
   padding: 6px 10px;
   text-align: left;
@@ -627,4 +623,72 @@ dialog::backdrop {
   cursor: pointer;
   border: none;
   background: none;
+}
+
+/* 🎯 Estilo unificado para todos os diálogos (quadro, coluna, cartão e confirmação) */
+dialog.large-dialog,
+dialog#confirm-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: var(--dialog-width);
+  padding: var(--dialog-padding);
+  background-color: var(--bg-board);
+  color: var(--text);
+  border: 5px solid var(--border);
+  border-radius: 8px;
+  font-size: var(--dialog-font-size);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+}
+
+dialog.large-dialog::backdrop,
+dialog#confirm-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* Título do diálogo */
+dialog.large-dialog h3,
+#confirm-dialog h3 {
+  margin: 0 0 1rem 0; /* remove topo, adiciona espaço embaixo */
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: var(--text);
+  text-align: center;
+}
+
+/* Texto dentro do diálogo */
+dialog.large-dialog p,
+#confirm-dialog p {
+  margin: 1em 0;
+  font-size: 1.4rem;
+  color: var(--text-muted);
+}
+
+/* Área de botões */
+dialog.large-dialog .modal-actions,
+#confirm-dialog .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+dialog.large-dialog .modal-actions button,
+#confirm-dialog .modal-actions button {
+  padding: var(--btn-padding);
+  border: 3px solid var(--border);
+  border-radius: var(--btn-radius);
+  cursor: pointer;
+  font-size: 1.3rem;
+  transition: background var(--transition-fast);
+  background-color: var(--bg-column);
+  color: var(--text);
+}
+
+dialog.large-dialog .modal-actions button:hover,
+#confirm-dialog .modal-actions button:hover {
+  background-color: var(--border-light);
 }

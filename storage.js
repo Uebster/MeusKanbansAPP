@@ -1,4 +1,5 @@
 // storage.js
+
 const path = require("path");
 const fs   = require("fs");
 
@@ -48,7 +49,7 @@ function writeJsonArray(filePath, arr) {
 /**
  * Faz backup de STORE_BOARDS antes de sobrescrever.
  * Gera um arquivo em data/backups/boards-YYYY-MM-DDTHH-mm-ss.json
- * Mantém apenas as 30 versões mais recentes.
+ * Mantém apenas as 1000 versões mais recentes.
  */
 async function backupBoards() {
   try {
@@ -65,12 +66,12 @@ async function backupBoards() {
 
     fs.copyFileSync(STORE_BOARDS, backupPath);
 
-    const files = fs
+    let files = fs
       .readdirSync(BACKUP_DIR)
       .filter(f => f.endsWith(".json"))
       .sort();
 
-    const excess = files.length - 30;
+    const excess = files.length - 1000;
     if (excess > 0) {
       for (let i = 0; i < excess; i++) {
         fs.unlinkSync(path.join(BACKUP_DIR, files[i]));
@@ -82,73 +83,97 @@ async function backupBoards() {
 }
 
 // ===========================
-// Novas funções para user-scope
+// Funções para manipulação de usuários
 // ===========================
-
-/**
- * Retorna só os boards pertencentes a um determinado userId.
- */
-async function getBoardsByUser(userId) {
-  const all = readJsonArray(STORE_BOARDS);
-  return all.filter(b => b.userId == userId);
+async function getAllUsers() {
+  return readJsonArray(STORE_USERS);
 }
 
-/**
- * Persiste apenas os boards deste usuário, mantendo os de outros intactos.
- */
+async function getUserById(id) {
+  const users = readJsonArray(STORE_USERS);
+  return users.find(u => u.id == id) || null;
+}
+
+async function insertUser({ username, password }) {
+  const users = readJsonArray(STORE_USERS);
+  const nextId = users.length
+    ? Math.max(...users.map(u => u.id)) + 1
+    : 1;
+  users.push({ id: nextId, username, password });
+  const { success, error } = writeJsonArray(STORE_USERS, users);
+  if (!success) throw new Error(error?.message || "Falha ao salvar usuário");
+  return { id: nextId, username };
+}
+
+async function updateUser({ id, username, password }) {
+  const users = readJsonArray(STORE_USERS);
+  const idx   = users.findIndex(u => u.id == id);
+  if (idx < 0) throw new Error("Usuário não encontrado");
+  users[idx] = { id: Number(id), username, password };
+  const { success, error } = writeJsonArray(STORE_USERS, users);
+  if (!success) throw new Error(error?.message || "Falha ao atualizar usuário");
+  return { id: Number(id), username };
+}
+
+async function deleteUser(id) {
+  const users    = readJsonArray(STORE_USERS);
+  const filtered = users.filter(u => u.id != id);
+  if (filtered.length === users.length) {
+    throw new Error("Usuário não encontrado");
+  }
+  const { success, error } = writeJsonArray(STORE_USERS, filtered);
+  if (!success) throw new Error(error?.message || "Falha ao excluir usuário");
+}
+
+// ===========================
+// Funções para Quadros Kanban Originais
+// ===========================
+async function getAllBoards() {
+  return readJsonArray(STORE_BOARDS);
+}
+
+async function saveBoards(boards) {
+  const { success, error } = writeJsonArray(STORE_BOARDS, boards);
+  if (!success) throw new Error(error?.message || "Falha ao salvar quadros");
+}
+
+// ===========================
+// Funções para Quadros por Usuário
+// ===========================
+async function getBoardsByUser(userId) {
+  const all = readJsonArray(STORE_BOARDS);
+  console.log("getBoardsByUser() leu:", all.length, "itens");
+  return all.filter(b => String(b.userId) === String(userId));
+}
+
 async function saveBoardsByUser(userId, boardsForUser) {
+  if (!Array.isArray(boardsForUser)) {
+    throw new Error("boardsForUser precisa ser um array");
+  }
   const all    = readJsonArray(STORE_BOARDS);
-  const others = all.filter(b => b.userId != userId);
+  const others = all.filter(b => String(b.userId) !== String(userId));
   const owned  = boardsForUser.map(b => ({ ...b, userId }));
   const merged = others.concat(owned);
   const { success, error } = writeJsonArray(STORE_BOARDS, merged);
-  if (!success) throw new Error(error?.message || 'Falha ao salvar quadros');
+  if (!success) throw new Error(error?.message || "Falha ao salvar quadros");
 }
 
 module.exports = {
-  // — Usuários —
-  getAllUsers: async ()      => readJsonArray(STORE_USERS),
-  getUserById: async id      => readJsonArray(STORE_USERS).find(u => u.id == id) || null,
-  insertUser: async ({ username, password }) => {
-    const users = readJsonArray(STORE_USERS);
-    const nextId = users.length
-      ? Math.max(...users.map(u => u.id)) + 1
-      : 1;
-    users.push({ id: nextId, username, password });
-    const { success, error } = writeJsonArray(STORE_USERS, users);
-    if (!success) throw new Error(error?.message || "Falha ao salvar usuário");
-    return { id: nextId, username };
-  },
-  updateUser: async ({ id, username, password }) => {
-    const users = readJsonArray(STORE_USERS);
-    const idx   = users.findIndex(u => u.id == id);
-    if (idx < 0) throw new Error("Usuário não encontrado");
-    users[idx] = { id: Number(id), username, password };
-    const { success, error } = writeJsonArray(STORE_USERS, users);
-    if (!success) throw new Error(error?.message || "Falha ao atualizar usuário");
-    return { id: Number(id), username };
-  },
-  deleteUser: async id => {
-    const users    = readJsonArray(STORE_USERS);
-    const filtered = users.filter(u => u.id != id);
-    if (filtered.length === users.length) {
-      throw new Error("Usuário não encontrado");
-    }
-    const { success, error } = writeJsonArray(STORE_USERS, filtered);
-    if (!success) throw new Error(error?.message || "Falha ao excluir usuário");
-  },
+  // Usuários
+  getAllUsers,
+  getUserById,
+  insertUser,
+  updateUser,
+  deleteUser,
 
-  // — Quadros Kanban originais —
-  getAllBoards: async ()     => readJsonArray(STORE_BOARDS),
-  saveBoards:  async boards  => {
-    const { success, error } = writeJsonArray(STORE_BOARDS, boards);
-    if (!success) throw new Error(error?.message || "Falha ao salvar quadros");
-  },
+  // Quadros Originais
+  getAllBoards,
+  saveBoards,
 
-  // — Backup de Boards —
+  // Backup
   backupBoards,
 
-  // — Quadros por Usuário —
+  // Quadros por Usuário
   getBoardsByUser,
-  saveBoardsByUser,
+  saveBoardsByUser
 };
