@@ -1,0 +1,56 @@
+{
+  "name": "kanban-app",
+  "version": "1.0.0",
+  "description": "Aplicativo Kanban construído com Electron",
+  "author": "Uebster Pilonetto <uebsterpilonetto@outlook.com>",
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "generate:icons": "npx icon-gen -i assets/MeusKanbans.png -o assets --report --ico --ico-name MeusKanbans --icns --icns-name MeusKanbans",
+    "clean": "rimraf node_modules dist",
+    "start": "electron .",
+    "build:win": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --x64 --publish never --config.directories.output=dist",
+    "build:linux": "electron-builder --linux --x64 --publish never --config.directories.output=dist",
+    "build:all": "npm run clean && npm run generate:icons && npm run build:win && npm run build:linux"
+  },
+  "build": {
+    "appId": "com.uebster.meuskanbansapp",
+    "productName": "MausKanbansApp",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/MeusKanbans.ico",
+      "sign": false
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "assets"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.2"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^28.3.3",
+    "electron-builder": "^26.0.12",
+    "icon-gen": "^5.0.0",
+    "rimraf": "^6.0.1"
+  }
+}

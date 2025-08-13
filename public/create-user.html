@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Criar Usuário</title>
+
+  <!-- tema global -->
+  <link rel="stylesheet" href="./style.css" />
+
+  <!-- estilos específicos -->
+  <link rel="stylesheet" href="./create-user.css" />
+  <script src="./universal-ui-controls.js"></script>
+</head>
+<body>
+  <div id="create-user-modal">
+    <header>
+      <h2 id="form-title">Criar Usuário</h2>
+    </header>
+
+    <input type="hidden" id="user-id" value="" />
+
+    <form id="create-user-form">
+      <div class="form-group">
+        <label for="username">Usuário</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          required
+          maxlength="32"
+          placeholder="Digite o nome de usuário"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Senha</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          required
+          minlength="4"
+          maxlength="32"
+          placeholder="4 a 32 caracteres"
+        />
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" id="btn-create">Criar</button>
+        <button type="button" id="delete-btn" style="display: none">Excluir</button>
+        <button type="button" id="cancel-btn" onclick="window.close()">Cancelar</button>
+      </div>
+
+      <p id="feedback" class="feedback"></p>
+    </form>
+  </div>
+
+  <script src="./create-user.js"></script>
+</body>
+</html>

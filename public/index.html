@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kanban Pessoal</title>
+
+  <!-- Fonte Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    body, button, input, textarea, select {
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Color picker */
+    .color-picker {
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
+    }
+
+    .picker-buttons button {
+      margin-left: 0.25em;
+      border-radius: 4px;
+    }
+
+    /* Nome do usuário */
+    .sidebar-user-name {
+      padding: 1rem;
+      text-align: center;
+      font-weight: 500;
+      border-bottom: 1px solid var(--border-light);
+      margin-bottom: 1rem;
+    }
+
+    .user-name {
+      margin-top: 0.25rem;
+      font-size: 1.5rem;
+      color: var(--text-secondary);
+    }
+  </style>
+
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="./universal-ui-controls.js"></script>
+</head>
+<body>
+
+  <div id="message-container"></div>
+
+  <div id="app">
+    <aside id="sidebar">
+      <!-- Espaço para exibir o nome do usuário logado -->
+      <div id="sidebar-user-name" class="sidebar-user-name"></div>
+      <!-- Menu suspenso -->
+<div id="user-menu" class="user-menu hidden">
+  <button id="switch-user">Trocar Usuário</button>
+</div>
+
+
+      <button id="add-board-btn">Adicionar Quadro</button>
+      <button id="add-column-btn">Adicionar Coluna</button>
+      <button id="add-card-btn">Adicionar Cartão</button>
+      <input type="search" id="searchInput" placeholder="🔍 Buscar cartões..." />
+      <hr />
+      <button id="save-btn">💾 Salvar Alterações</button>
+      <button id="export-btn">📁 Exportar JSON</button>
+      <button id="import-btn">📁 Importar JSON</button>
+      <button id="exportImageBtn">🖼️ Exportar Imagem</button>
+      <button id="print-btn">🖨️ Imprimir Quadro</button>
+      <button id="theme-toggle-btn">🌓 Alternar Tema</button>
+      <!-- botão que exibe o select -->
+<button
+  id="font-toggle-btn"
+  type="button"
+  aria-expanded="false"
+  aria-controls="font-select"
+>
+  🅰️ Alterar Fonte
+</button>
+
+<!-- nosso select, escondido por padrão -->
+<select
+  id="font-select"
+  class="hidden"
+  aria-placeholder="Selecione uma fonte"
+>
+  <option value="">Padrão</option>
+  <!-- opções injetadas pelo script -->
+</select>
+
+<!-- botão que abre o slider de tamanho -->
+<button
+  id="font-size-toggle-btn"
+  type="button"
+  aria-expanded="false"
+  aria-controls="font-size-input"
+>
+  🔠 Tamanho
+</button>
+
+<!-- slider escondido por padrão -->
+<input
+  id="font-size-input"
+  class="hidden"
+  type="range"
+  min="12"
+  max="32"
+  value="14"
+/>
+<span id="font-size-display" class="hidden">14px</span>
+
+
+
+      <button id="exit-btn">❌ Fechar Programa</button>
+      <hr />
+      <ul id="index-list"></ul>
+    </aside>
+
+    <main id="main-area">
+      <h1 id="kanban-title">Meus Kanbans</h1>
+
+      <!-- Espaço para exibir o nome do usuário abaixo do título -->
+      <p id="user-name" class="user-name"></p>
+
+      <div id="board-header">
+        <select id="board-select"></select>
+        <button id="edit-board-btn" title="Editar Quadro">Editar</button>
+        <button id="delete-board-btn" title="Excluir Quadro">Excluir</button>
+      </div>
+      <div id="columns-container"></div>
+    </main>
+  </div>
+
+  <!-- ... (templates de diálogo / menus continuam os mesmos) ... -->
+
+  <!-- Templates de diálogo / menus -->
+
+  <!-- ▶️ Quadro -->
+  <template id="board-dialog">
+    <dialog class="large-dialog">
+      <h3>Configurar Quadro</h3>
+      <div class="form-group">
+        <label>Título:</label>
+        <input type="text" id="board-title-input" />
+      </div>
+      <menu class="modal-actions">
+        <button id="board-save-btn">Salvar</button>
+        <button id="board-cancel-btn">Cancelar</button>
+      </menu>
+    </dialog>
+  </template>
+
+  <!-- ▶️ Coluna -->
+  <template id="column-dialog">
+    <dialog class="large-dialog">
+      <h3>Configurar Coluna</h3>
+      <div class="form-group">
+        <label>Nome:</label>
+        <input type="text" id="column-title-input" />
+      </div>
+<div class="form-group color-inline">
+  <label for="column-color-input">Cor da Coluna:</label>
+  <input type="color" id="column-color-input" value="#ffffff" />
+</div>
+      <menu class="modal-actions">
+        <button id="column-save-btn">Salvar</button>
+        <button id="column-delete-btn">Excluir</button>
+        <button id="column-cancel-btn">Cancelar</button>
+      </menu>
+    </dialog>
+  </template>
+
+  <!-- ▶️ Cartão -->
+  <template id="card-dialog">
+    <dialog class="large-dialog">
+      <h3>Configurar Cartão</h3>
+      <div class="form-group">
+        <label>Coluna:</label>
+        <select id="card-column-select"></select>
+      </div>
+      <div class="form-group">
+        <label>Título:</label>
+        <input type="text" id="card-title-input" />
+      </div>
+<div class="form-group color-inline">
+  <label for="card-color-input">Cor do Cartão:</label>
+  <input type="color" id="card-color-input" value="#858585" />
+</div>
+
+<div class="form-group color-inline">
+  <label for="card-text-color-input">Cor do Texto:</label>
+  <input type="color" id="card-text-color-input" value="#3d3d3d" />
+</div>
+      <menu class="modal-actions">
+        <button id="card-save-btn">Salvar</button>
+        <button id="card-cancel-btn">Cancelar</button>
+      </menu>
+    </dialog>
+  </template>
+
+  <!-- ▶️ Menu de contexto da coluna -->
+  <template id="column-menu">
+    <div class="column-menu">
+      <button id="column-edit-btn">✏️ Editar</button>
+      <button id="column-delete-btn">🗑️ Excluir</button>
+    </div>
+  </template>
+
+  <!-- ▶️ Menu de contexto do cartão -->
+  <template id="card-menu">
+    <div class="card-menu">
+      <button id="card-edit-btn">✏️ Editar</button>
+      <button id="card-delete-btn">🗑️ Excluir</button>
+    </div>
+  </template>
+
+</body>
+</html>

@@ -1,0 +1,630 @@
+/* static/style.css */
+/* Reset e tema dark */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* cores */
+  --bg-page: #2b2b2b;
+  --bg-sidebar: #232323;
+  --bg-board: #1f1f1f;
+  --bg-column: #282828;
+  --bg-column-header: #333;
+  --bg-card: #444;
+  --text: #e0e0e0;
+  --text2: #3d3d3d;
+  --text-muted: #bbb;
+  --border: #444;
+  --border-light: #555;
+  --transition-fast: 0.2s;
+
+  /* tipografia */
+  --app-font-family: "Segoe UI", sans-serif;
+  --app-font-size: 14px;
+  --sidebar-font-size: 14px;
+
+  /* diálogos */
+  --dialog-width: 600px;
+  --dialog-font-size: 1.1rem;
+  --dialog-padding: 32px;
+
+  /* picker */
+  --picker-size: 2.5rem;
+  --btn-padding: 8px 16px;
+  --btn-radius: 4px;
+}
+
+/* define o root font-size a partir da variável */
+html {
+  font-size: var(--app-font-size);
+}
+
+body {
+  font-family: var(--app-font-family);
+  font-size: 1rem;
+  background-color: var(--bg-page);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+}
+
+/* tema claro apenas sobrescreve cores e padding/font-size específicos */
+body.light-mode {
+  --bg-page: #f5f5f5;
+  --bg-sidebar: #eaeaea;
+  --bg-board: #ffffff;
+  --bg-column: #f0f0f0;
+  --bg-column-header: #dcdcdc;
+  --bg-card: #ffffff;
+  --text: #222222;
+  --text2: #333333;
+  --text-muted: #666666;
+  --border: #cccccc;
+  --border-light: #bbbbbb;
+
+  --dialog-font-size: 1.1rem;
+  --dialog-padding: 32px;
+}
+
+/* Sidebar fixo */
+#sidebar {
+  width: 260px;
+  background-color: var(--bg-sidebar);
+  font-family: var(--app-font-family);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  font-size: var(--sidebar-font-size) !important;
+}
+
+#sidebar * {
+  font-size: inherit !important;
+}
+
+/* Botões do sidebar */
+#sidebar button {
+  background-color: var(--bg-column);
+  color: var(--text);
+  border: none;
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.9rem;
+  transition: background var(--transition-fast);
+}
+
+#sidebar button:hover {
+  background-color: var(--border-light);
+}
+
+#sidebar hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0;
+}
+
+/* Áreas que escalam com o tamanho da fonte */
+.board,
+.column,
+.card {
+  font-size: var(--app-font-size);
+}
+
+/* Botão de tema */
+#toggleTheme {
+  font-size: 1.2rem;
+  padding: 0.5em 1em;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  font-family: var(--app-font-family);
+}
+
+#toggleTheme:hover {
+  transform: scale(1);
+}
+
+/* Layout principal */
+#app {
+  display: flex;
+  width: 100%;
+}
+
+button,
+label {
+  background-color: var(--bg-column);
+  color: var(--text);
+  border: none;
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 1.2rem;
+  font-family: var(--app-font-family);
+  transition: background var(--transition-fast);
+}
+
+button:hover {
+  background-color: var(--border-light);
+}
+
+/* você pode ser ainda mais específico só para o nome */
+#sidebar-user-name {
+  /* herda do #sidebar: var(--sidebar-font-size) */
+  font-size: 18px !important;
+  /* opcional: um pouco de destaque */
+  font-weight: bold;
+  padding: 18px;
+  margin-bottom: 12px;
+}
+
+.sidebar-user-name,
+.user-menu {
+  margin: 0;
+  padding: 0;
+  line-height: normal;      /* evita gaps por altura de linha */
+}
+
+/* escondido por padrão */
+/* esconde o select */
+#font-select.hidden {
+  display: none;
+}
+
+/* quando tiver .show, exibe */
+#font-select.show {
+  display: inline-block;
+}
+
+.hidden {
+  display: none;
+}
+
+.show {
+  display: inline-block;
+}
+
+#font-size-input,
+#font-size-display {
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* Selects */
+select {
+  background-color: var(--bg-column);
+  color: var(--text);
+  border: 3px solid var(--border-light);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 1.2rem;
+  font-family: var(--app-font-family);
+  appearance: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+select:hover {
+  background-color: var(--border-light);
+}
+
+/* Main area */
+#main-area {
+  flex: 1;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+}
+
+#board-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* Novo título */
+#kanban-title {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+#columns-container {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+}
+
+/* Column */
+.column {
+  width: 650px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  background-color: var(--bg-column);
+  border: 4px solid var(--border-light);
+}
+
+.column-header {
+  padding: 12px;
+  background-color: var(--bg-column-header);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  
+  justify-content: space-between;
+  border-bottom: 4px solid var(--border-light);
+}
+
+.column-header:active {
+  cursor: grabbing;
+}
+
+.column-header h3 {
+  margin: 0;
+  font-size: 1.6rem;
+  color: var(--text);
+}
+
+.cards-container {
+  padding: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.card {
+  background-color: var(--bg-card);
+  border: 4px solid var(--border-light);
+  padding: 14px;
+  border-radius: 6px;
+  cursor: grab;
+  color: var(--text2);
+  font-weight: bold;
+  font-size: 1.4rem;
+  text-align: center;
+  transition: background var(--transition-fast);
+}
+
+.card:active {
+  background-color: var(--border);
+}
+
+.column-footer {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.column-footer .add-card-btn {
+  background: var(--bg-column);
+  border: 3px solid var(--border-light);
+  color: var(--text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.column-footer .add-card-btn:hover {
+  color: var(--text-muted);
+  background-color: var(--border-light);
+}
+
+/* Dialogs */
+dialog {
+  width: 90%;
+  max-width: var(--dialog-width);
+  padding: var(--dialog-padding);
+  background-color: var(--bg-board);
+  color: var(--text);
+  border: none;
+  border-radius: 8px;
+  font-size: var(--dialog-font);
+  transition: opacity var(--transition-fast);
+}
+dialog.large-dialog {
+  max-width: var(--dialog-width);
+}
+dialog::backdrop {
+  background: rgba(0,0,0,0.6);
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1rem;
+  color: var(--text);
+}
+.form-group input[type="text"],
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  background-color: var(--bg-column);
+  color: var(--text);
+  font-size: 1rem;
+
+}
+
+#searchInput {
+  padding: 0.6em 1em;
+  border-radius: 8px;
+  border: 3px solid var(--border-light);
+  background-color: var(--bg-column);
+  color: var(--text);
+  font-size: 1rem;
+  width: 100%;
+  max-width: 320px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+#searchInput::placeholder {
+  color: #888;
+}
+
+#searchInput:focus {
+  border-color: #00bcd4;
+}
+
+#searchInput::placeholder {
+  color: #aaa;
+}
+
+#searchInput:focus {
+  border-color: #00bcd4;
+}
+
+@media print {
+  /* 1) Zera margens do PDF (o tamanho/orientação vem do <style> dinâmico injetado) */
+  @page {
+    margin: 0;
+  }
+
+  /* 2) Esconde todo o resto, só mostra o container e o footer */
+  body.printing > *:not(#print-container):not(#print-footer) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* 3) Container ocupa 100% da largura útil de um A4 */
+  #print-container {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    visibility: visible !important;
+    /* deixa espaço para o footer sem sobreposição */
+    margin-bottom: 2.5cm !important;
+  }
+
+  /* 4) A imagem escala para preencher o container */
+  #print-container img {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+  }
+
+  /* 5) Footer fixo na base, acima da margem do A4 */
+  #print-footer {
+    position: fixed !important;
+    bottom: 1cm !important;        /* respeita a margem interna do @page */
+    left: 0 !important;
+    right: 0 !important;
+    padding: 0.5em 1em !important;
+    font-size: 0.8em !important;
+    text-align: right !important;
+    background: white !important;
+    border-top: 1px solid #ccc !important;
+    visibility: visible !important;
+    z-index: 1000 !important;
+  }
+}
+
+.user-menu {
+  position: absolute;
+  top: 60px; /* ajuste conforme a posição do nome */
+  left: 20px; /* ou use right se estiver alinhado à direita */
+  background: var(--bg-sidebar);
+  border: 3px solid var(--border-light);
+  padding: 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 100;
+}
+
+.hidden {
+  display: none;
+}
+
+.no-results {
+  padding: 1rem;
+  text-align: center;
+  color: #888;
+  font-style: italic;
+}
+/* Color Picker inside dialogs */
+.color-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.color-picker input[type="color"] {
+  width: var(--picker-size);
+  height: var(--picker-size);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.picker-buttons {
+  display: flex;
+  gap: 8px;
+}
+.picker-buttons .btn-confirm,
+.picker-buttons .btn-cancel {
+  padding: var(--btn-padding);
+  border: none;
+  border-radius: var(--btn-radius);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background var(--transition-fast);
+}
+.picker-buttons .btn-confirm:hover {
+  background-color: #2ecc71;
+}
+.picker-buttons .btn-cancel:hover {
+  background-color: #e74c3c;
+}
+
+/* Modal actions */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 20px;
+}
+.modal-actions button {
+  padding: var(--btn-padding);
+  border: none;
+  border-radius: var(--btn-radius);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background var(--transition-fast);
+}
+.modal-actions button:hover {
+  background-color: var(--border-light);
+}
+
+/* Toast messages */
+#message-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+}
+.message {
+  background-color: rgba(50, 50, 50, 0.9);
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  animation: fade-in-out 4s ease forwards;
+}
+.message.error {
+  background-color: rgba(150, 0, 0, 0.9);
+}
+@keyframes fade-in-out {
+  0%    { opacity: 0; transform: translateY(-10px); }
+  10%,90% { opacity: 1; transform: translateY(0); }
+  100%  { opacity: 0; transform: translateY(-10px); }
+}
+
+/* Context menus */
+.card-menu,
+.column-menu {
+  position: absolute;
+  background-color: var(--bg-board);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 3000;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.card-menu button,
+.column-menu button {
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.card-menu button:hover,
+.column-menu button:hover {
+  background-color: var(--bg-column);
+}
+
+#exportImageBtn {
+  padding: 8px 12px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* 1. Defina a espessura da barra */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+/* 2. Fundo do trilho */
+::-webkit-scrollbar-track {
+  background: var(--bg-column);
+  border-radius: 2px;
+}
+
+/* 3. “Thumb” que você arrasta */
+::-webkit-scrollbar-thumb {
+  background-color: var(--bg-card);
+  border-radius: 2px;
+  border: 2px solid var(--border-light);
+}
+
+/* 4. Hover e active */
+::-webkit-scrollbar-thumb:hover {
+  background-color: #888;
+}
+::-webkit-scrollbar-thumb:active {
+  background-color: #666;
+}
+
+/* 5. Canto entre barras */
+::-webkit-scrollbar-corner {
+  background: #777;
+}
+
+.color-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-inline label {
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 120px;
+  margin: 0;
+}
+
+.color-inline input[type="color"] {
+  cursor: pointer;
+  border: none;
+  background: none;
+}

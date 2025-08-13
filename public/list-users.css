@@ -1,0 +1,188 @@
+/* public/list-users.css */
+
+/* Container principal */
+.container {
+  max-width: 800px;
+  margin: 1.5rem auto;
+  padding: 1rem;
+  background-color: var(--bg-board);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Cabeçalho */
+.container header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+/* Botão Novo Usuário */
+#btn-new-user {
+  font-size: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--bg-column);
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+#btn-new-user:hover {
+  background-color: var(--border-light);
+}
+
+/* Tabela de usuários */
+#users-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#users-table th,
+#users-table td {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+#users-table th {
+  background-color: var(--bg-column-header);
+  color: var(--text);
+}
+
+#users-table td {
+  color: var(--text2);
+}
+
+#users-table tr:nth-child(even) {
+  background-color: var(--bg-column);
+}
+
+/* Destaque da linha selecionada */
+#users-table tr.selected {
+  background-color: var(--bg-column-header);
+}
+
+#users-table tr.selected td {
+  color: var(--text);
+}
+
+/* Botões de ação dentro da tabela */
+#users-table button {
+  margin-right: 0.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+/* Rodapé de ações */
+.actions-bottom {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+/* Botão alternar tema */
+#toggleTheme {
+  font-size: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--bg-column);
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+#toggleTheme:hover {
+  background-color: var(--border-light);
+}
+
+/* Botão confirmar */
+#confirm-user {
+  font-size: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--bg-column);
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+#confirm-user:disabled {
+  background-color: var(--border);
+  color: var(--text2);
+  cursor: not-allowed;
+}
+
+#confirm-user:not(:disabled):hover {
+  background-color: var(--border-light);
+}
+
+/* Feedback de operações */
+.feedback {
+  margin-top: 1rem;
+  font-weight: bold;
+  color: var(--text);
+  text-align: center;
+}
+
+.actions-top {
+  display: flex;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.action-button {
+  padding: 0.3rem 0.6rem;
+  background-color: var(--bg-column);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.action-button:hover {
+  background-color: var(--border-light);
+  color: var(--text);
+  transition: background var(--transition-fast);
+}
+
+input[type="password"],
+select {
+  width: 100%;
+  padding: 10px;
+  border: 3px solid var(--border-light);
+  border-radius: 4px;
+  background-color: var(--bg-column);
+  color: var(--text);
+  font-size: 1rem;
+
+}
+
+.modal-box {
+  background: var(--bg-column);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  border-radius: 8px;
+  padding: 1.5rem;
+  width: 320px;
+  text-align: center;
+}
+
+.modal-box input {
+  width:100%;
+  padding:0.5rem;
+  margin:0.5rem 0;
+  background: var(--bg-column);
+  border:1px solid var(--border);
+  color: var(--text);
+}

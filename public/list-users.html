@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Usuários</title>
+
+  <!-- Global styles / tema -->
+  <link rel="stylesheet" href="./style.css" />
+
+  <!-- Estilos específicos da listagem -->
+  <link rel="stylesheet" href="./list-users.css" />
+  <script src="./universal-ui-controls.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Usuários</h1>
+      <div class="actions-top">      
+</div>
+    </header>
+    <div class="actions-top">
+<div button id="toggleTheme" title="Alternar tema">🌓 Alternar tema</button>
+</div></div>
+<div class="actions-top">
+      <div button id="btn-new-user">Criar Usuário</button></div></div>
+      
+    <table id="users-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Usuário</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Linhas injetadas via JS -->
+      </tbody>
+    </table>
+
+    <div class="actions-bottom">
+      <button id="confirm-user" disabled>Login</button> 
+    </div>
+
+    <p id="feedback" class="feedback"></p>
+  </div>
+
+  <script src="./list-users.js"></script>
+</body>
+</html>

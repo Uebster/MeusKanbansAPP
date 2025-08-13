@@ -1,0 +1,104 @@
+/* public/create-user.css */
+
+/* Container do modal */
+#create-user-modal {
+  max-width: 360px;
+  margin: 2rem auto;
+  padding: var(--dialog-padding);
+  background-color: var(--bg-board);
+  border-radius: 8px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+  font-family: inherit;
+  color: var(--text);
+  font-size: var(--dialog-font);
+}
+
+/* Cabeçalho */
+#create-user-modal header {
+  background-color: var(--bg-column-header);
+  padding: 0.75rem 1rem;
+  margin: calc(-1 * var(--dialog-padding)) calc(-1 * var(--dialog-padding))
+          var(--dialog-padding);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+#create-user-modal header h2 {
+  margin: 0;
+  text-align: center;
+  color: var(--text);
+  font-size: 1.25rem;
+}
+
+/* Formulário */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  background-color: var(--bg-column);
+  color: var(--text);
+  font-size: 1rem;
+  transition: border-color var(--transition-fast);
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--border);
+}
+
+/* Botões de ação */
+.modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.modal-actions button {
+  flex: 1;
+  padding: var(--btn-padding);
+  border: none;
+  border-radius: var(--btn-radius);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background var(--transition-fast);
+  background-color: var(--bg-column);
+  color: var(--text);
+}
+
+#btn-create {
+  background-color: var(--bg-column-header);
+}
+
+#delete-btn {
+  background-color: #e53935;
+  color: #fff;
+}
+
+#cancel-btn {
+  background-color: var(--border-light);
+}
+
+.modal-actions button:hover {
+  background-color: var(--border);
+  color: var(--text);
+}
+
+/* Feedback */
+.feedback {
+  margin-top: 1rem;
+  font-weight: bold;
+  color: var(--text);
+  text-align: center;
+}
