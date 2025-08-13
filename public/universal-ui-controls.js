@@ -33,6 +33,7 @@ document.addEventListener('keydown', e => {
       e.preventDefault();
       const saveBtn =
         dialog.querySelector('button[id$="-save-btn"]') ||
+        dialog.querySelector('#confirm-ok-btn') ||
         dialog.querySelector('button[type="submit"]');
       if (saveBtn) saveBtn.click();
       return;
